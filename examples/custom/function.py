@@ -6,7 +6,7 @@ Custom Lambda Function
 
 import faas_profiler as fp
 
-fp.profile()
+@fp.profile()
 def handler(event, context):
     a = [1] * (10 ** 6)
     b = [2] * (2 * 10 ** 7)
