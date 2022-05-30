@@ -6,7 +6,7 @@ TODO:
 
 from enum import Enum
 import os
-from time import sleep
+from time import time
 from typing import List, Type, Callable, Any
 from functools import wraps
 from multiprocessing import Process, Pipe, connection
