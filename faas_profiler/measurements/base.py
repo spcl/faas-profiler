@@ -8,7 +8,7 @@ Defines abstract base class for all measurements and measuring points
 
 
 from abc import ABC, abstractmethod, abstractproperty
-from typing import Any, NamedTuple, Type
+from typing import Any, List, NamedTuple, Type
 from schema import Schema
 
 

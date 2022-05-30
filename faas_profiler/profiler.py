@@ -9,15 +9,18 @@ import os
 from time import time
 from typing import List, Type, Callable, Any
 from functools import wraps
+from contextlib import nullcontext
 from multiprocessing import Process, Pipe, connection
 
 from faas_profiler.measurements import *
+from faas_profiler.captures import InvocationCapture
 
 
 def profile(
     measurements=None,
     formatter=None,
-    exporters=None
+    exporters=None,
+    invocation_capture=None
 ):
     """
     FaaS Profiler decorator.
@@ -35,7 +38,11 @@ def profile(
     def function_profiler(func):
         @wraps(func)
         def profiler_wrapper(*args, **kwargs):
-            profiler = Profiler(formatter, exporters, measurements)
+            profiler = Profiler(
+                formatter,
+                exporters,
+                measurements,
+                invocation_capture)
 
             function_return = profiler(func, *args, **kwargs)
 
@@ -56,11 +63,13 @@ class Profiler:
         self,
         measurements: List[Type[Measurement]] = None,
         formatter=None,
-        exporters=None
+        exporters=None,
+        invocation_capture: Type[InvocationCapture] = None
     ) -> None:
         self.measurements = measurements if measurements else self._initialize_all_measurements()
         self.formatter = formatter
         self.exporters = exporters
+        self.invocation_capture = invocation_capture
 
         if not self.measurements:
             raise RuntimeError(
@@ -128,9 +137,12 @@ class Profiler:
         """
         self.start()
 
-        func_ret = func(*args, **kwargs)
+        with self.invocation_capture.capture() if self.invocation_capture else nullcontext():
+            func_ret = func(*args, **kwargs)
 
         self.stop()
+
+        self.results["Invocation Captures"] = self.invocation_capture.invocations
 
         return func_ret
 
