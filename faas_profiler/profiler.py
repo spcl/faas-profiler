@@ -56,14 +56,15 @@ class Profiler:
         self,
         measurements: List[Type[Measurement]] = None,
         formatter=None,
-        exporters = None
+        exporters=None
     ) -> None:
         self.measurements = measurements if measurements else self._initialize_all_measurements()
         self.formatter = formatter
         self.exporters = exporters
 
         if not self.measurements:
-            raise RuntimeError("Cannot create a profiler without configured measurements.")
+            raise RuntimeError(
+                "Cannot create a profiler without configured measurements.")
 
         self.profiler_pid = os.getpid()
 
@@ -83,7 +84,7 @@ class Profiler:
 
         if self.parent_endpoint:
             self.parent_endpoint.close()
-        
+
         if self.child_endpoint:
             self.child_endpoint.close()
 
@@ -102,7 +103,6 @@ class Profiler:
         if process_state == ProfilerState.ERROR:
             raise RuntimeError("Error")
 
-
     def stop(self) -> None:
         """
         Stops the current profile run.
@@ -113,7 +113,7 @@ class Profiler:
         if process_state == ProfilerState.ERROR:
             raise RuntimeError("Error while Stopping")
 
-        self.results =  self.parent_endpoint.recv()
+        self.results = self.parent_endpoint.recv()
         self.profile_process.join()
 
     def export(self) -> None:
@@ -129,7 +129,7 @@ class Profiler:
         self.start()
 
         func_ret = func(*args, **kwargs)
-        
+
         self.stop()
 
         return func_ret
@@ -216,10 +216,8 @@ class ProfileProcess(Process):
             self.pipe_endpoint.send(ProfilerState.ERROR)
             return
 
-
         # Send results
         self.pipe_endpoint.send(self._gather_results())
-
 
     def _start_measurements(self) -> bool:
         """
@@ -242,7 +240,6 @@ class ProfileProcess(Process):
             measurement.on_stop(self.profile_pid, time())
 
         return True
-
 
     def _gather_results(self) -> dict:
         """
