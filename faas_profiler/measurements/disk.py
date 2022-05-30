@@ -61,8 +61,7 @@ class DiskUsage(Measurement):
     }])
     name = "Disk Usage"
 
-    def __init__(self, paths: List[str] = [
-                 "/Users/maltewae/src/github.com/spcl/faas-profiler/examples/custom/"]) -> None:
+    def __init__(self, paths: List[str] = ["/"]) -> None:
         self.paths = paths
 
         self.start_snapshots = {}
