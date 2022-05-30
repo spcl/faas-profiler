@@ -1,2 +1,4 @@
 schema
 psutil
+mock
+boto3

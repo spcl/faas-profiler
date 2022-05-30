@@ -36,7 +36,7 @@ ARG RUNTIME_VERSION
 RUN mkdir -p ${FUNCTION_DIR}
 
 # INSTALL PROFILER by copying files
-ADD /faas_profiler ${FUNCTION_DIR}/faas_profilerg
+ADD /faas_profiler ${FUNCTION_DIR}/faas_profiler
 ADD requirements.txt ${FUNCTION_DIR}
 
 WORKDIR ${FUNCTION_DIR}
