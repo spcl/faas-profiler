@@ -5,7 +5,7 @@ Custom Lambda Function
 """
 
 from datetime import datetime
-from os import path
+from os import path, environ
 
 import boto3
 
@@ -50,19 +50,21 @@ def upload_s3():
 @fp.profile(
     exporters=[
         S3Exporter(
-            "foo", "results")], invocation_capture=InvocationCapture(
-                ["boto3.s3.transfer.S3Transfer.upload_file"]))
+            environ['BUCKET_NAME'],
+            "results")],
+    invocation_capture=InvocationCapture(
+        ["boto3.s3.transfer.S3Transfer.upload_file"]))
 def handler(event, context):
-    runtime_dir = path.abspath(path.dirname(__file__))
+    temp_dir = "/tmp/"
     file_suffix = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
     content = some_memory_heavy_calc()
 
-    write_ethz_to_file(path.join(runtime_dir, f"ethz_{file_suffix}.html"))
+    write_ethz_to_file(path.join(temp_dir, f"ethz_{file_suffix}.html"))
 
     write_some_content(
         path.join(
-            runtime_dir,
+            temp_dir,
             f"foo_{file_suffix}.text"),
         content)
 

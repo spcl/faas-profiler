@@ -19,8 +19,7 @@ from faas_profiler.measurements import *
 from faas_profiler.export import *
 from faas_profiler.captures import InvocationCapture
 
-RUNTIME_DIR = os.path.abspath(os.path.dirname(__file__))
-RESULTS_DIR = os.path.join(RUNTIME_DIR, "tmp")
+RESULTS_DIR = "/tmp/"
 
 
 def profile(
