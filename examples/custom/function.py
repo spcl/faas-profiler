@@ -11,6 +11,7 @@ import boto3
 
 import faas_profiler as fp
 from faas_profiler.captures import InvocationCapture
+from faas_profiler.export import S3Exporter
 
 
 def write_ethz_to_file(file):
@@ -46,8 +47,11 @@ def upload_s3():
         print("mhm")
 
 
-@fp.profile(invocation_capture=InvocationCapture(
-    ["boto3.s3.transfer.S3Transfer.upload_file"]))
+@fp.profile(
+    exporters=[
+        S3Exporter(
+            "foo", "results")], invocation_capture=InvocationCapture(
+                ["boto3.s3.transfer.S3Transfer.upload_file"]))
 def handler(event, context):
     runtime_dir = path.abspath(path.dirname(__file__))
     file_suffix = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")

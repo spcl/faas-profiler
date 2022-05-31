@@ -4,22 +4,29 @@
 TODO:
 """
 
-from enum import Enum
 import os
+import json
+
+from enum import Enum
 from time import time
+from datetime import datetime
 from typing import List, Type, Callable, Any
 from functools import wraps
 from contextlib import nullcontext
 from multiprocessing import Process, Pipe, connection
 
 from faas_profiler.measurements import *
+from faas_profiler.export import *
 from faas_profiler.captures import InvocationCapture
+
+RUNTIME_DIR = os.path.abspath(os.path.dirname(__file__))
+RESULTS_DIR = os.path.join(RUNTIME_DIR, "tmp")
 
 
 def profile(
-    measurements=None,
+    measurements=[],
     formatter=None,
-    exporters=None,
+    exporters=[],
     invocation_capture=None
 ):
     """
@@ -39,9 +46,9 @@ def profile(
         @wraps(func)
         def profiler_wrapper(*args, **kwargs):
             profiler = Profiler(
+                measurements,
                 formatter,
                 exporters,
-                measurements,
                 invocation_capture)
 
             function_return = profiler(func, *args, **kwargs)
@@ -61,9 +68,9 @@ class Profiler:
 
     def __init__(
         self,
-        measurements: List[Type[Measurement]] = None,
+        measurements: List[Type[Measurement]] = [],
         formatter=None,
-        exporters=None,
+        exporters: List[Type[Exporter]] = [],
         invocation_capture: Type[InvocationCapture] = None
     ) -> None:
         self.measurements = measurements if measurements else self._initialize_all_measurements()
@@ -128,8 +135,19 @@ class Profiler:
     def export(self) -> None:
         """
         Exports the current profile run.
+
+        TODO: This is just first draft so see results
         """
-        print(self.results)
+        os.makedirs(RESULTS_DIR, exist_ok=True)
+
+        file_suffix = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        result_file = os.path.join(RESULTS_DIR, f"result_{file_suffix}.json")
+
+        with open(result_file, 'w') as fp:
+            json.dump(self.results, fp)
+
+        for exporter in self.exporters:
+            exporter.export(result_file)
 
     def __call__(self, func: Type[Callable], *args, **kwargs) -> Any:
         """
