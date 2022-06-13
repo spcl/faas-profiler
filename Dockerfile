@@ -1,8 +1,6 @@
 #
-#   Dockerfile to build container for examples
+#   Dockerfile to build container for example functions
 #
-#   Usage (executed from project root):
-#   docker build -t IMAGE_NAME -f examples/Dockerfile .  --build-arg function_name=FUNCTION_NAME
 
 ARG FUNCTION_DIR="/function"
 ARG RUNTIME_VERSION="3.8"
@@ -29,28 +27,25 @@ RUN apk add --no-cache \
     linux-headers \
     gcc
 
-ARG function_name
 ARG FUNCTION_DIR
 ARG RUNTIME_VERSION
 
 RUN mkdir -p ${FUNCTION_DIR}
-
-# INSTALL PROFILER by copying files
-ADD /faas_profiler ${FUNCTION_DIR}/faas_profiler
-ADD requirements.txt ${FUNCTION_DIR}
-
 WORKDIR ${FUNCTION_DIR}
 
-RUN python${RUNTIME_VERSION} -m pip install -r requirements.txt --target ${FUNCTION_DIR}
+# Update pip
+RUN python${RUNTIME_VERSION} -m pip install --upgrade pip
 
-# INSTALL FUNCTION by copying files
-ADD examples/${function_name}/function.py ${FUNCTION_DIR}
-ADD examples/${function_name}/requirements.function.txt ${FUNCTION_DIR}
+# Install faas-profiler
+ADD dist wheels/
+RUN python${RUNTIME_VERSION} -m pip install --find-links=wheels/ faas_profiler
 
-RUN python${RUNTIME_VERSION} -m pip install -r requirements.function.txt --target ${FUNCTION_DIR}
+# Cop example functions and install dependencies
+ADD examples .
+RUN python${RUNTIME_VERSION} -m pip install -r requirements_function.txt
 
 # INSTALL AWS LAMBDA
-RUN python${RUNTIME_VERSION} -m pip install awslambdaric --target ${FUNCTION_DIR}
+RUN python${RUNTIME_VERSION} -m pip install awslambdaric
 
 # 3. STAGE: Build final runtime
 FROM python-alpine
@@ -65,4 +60,3 @@ ADD https://github.com/aws/aws-lambda-runtime-interface-emulator/releases/latest
 COPY examples/entry.sh /
 RUN chmod 755 /usr/bin/aws-lambda-rie /entry.sh
 ENTRYPOINT [ "/entry.sh" ]
-CMD [ "function.handler" ]
