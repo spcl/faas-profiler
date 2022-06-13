@@ -10,6 +10,7 @@ with open("requirements.txt", "r") as fh:
 
 setuptools.setup(
     name="faas_profiler",
+    version="0.0.1",
     description="FaaS-Profiler is a software to profile serverless functions.",
     url="https://github.com/spcl/faas-profiler",
     packages=setuptools.find_packages(),

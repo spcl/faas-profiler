@@ -1,0 +1,21 @@
+service: faas-profiler
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  ecr:
+    images:
+      faas_profiler_image:
+        path: ./
+  region: eu-central-1
+  stage: dev
+
+functions:
+  hello_world:
+    image:
+      name: faas_profiler_image
+      command: hello_world.handler
+    events:
+      - httpApi:
+          method: GET
+          path: /hello_world
