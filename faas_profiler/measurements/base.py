@@ -19,6 +19,7 @@ class Measurement(ABC):
 
     schema: Type[Schema] = None
     name: str = None
+    runs_in_thread: bool = True
 
     @abstractproperty
     def results(self) -> dict:

@@ -25,8 +25,7 @@ RESULTS_DIR = "/tmp/"
 def profile(
     measurements=[],
     formatter=None,
-    exporters=[],
-    invocation_capture=None
+    exporters=[]
 ):
     """
     FaaS Profiler decorator.
@@ -47,8 +46,7 @@ def profile(
             profiler = Profiler(
                 measurements,
                 formatter,
-                exporters,
-                invocation_capture)
+                exporters)
 
             function_return = profiler(func, *args, **kwargs)
 
@@ -69,13 +67,13 @@ class Profiler:
         self,
         measurements: List[Type[Measurement]] = [],
         formatter=None,
-        exporters: List[Type[Exporter]] = [],
-        invocation_capture: Type[InvocationCapture] = None
+        exporters: List[Type[Exporter]] = []
     ) -> None:
         self.measurements = measurements if measurements else self._initialize_all_measurements()
+        self.thread_measurements = [meas for meas in self.measurements if meas.runs_in_thread]
+        self.main_measurements = [meas for meas in self.measurements if not meas.runs_in_thread]
         self.formatter = formatter
         self.exporters = exporters
-        self.invocation_capture = invocation_capture
 
         if not self.measurements:
             raise RuntimeError(
@@ -93,6 +91,11 @@ class Profiler:
         """
         Starts a new profile run.
         """
+        start_time = time()
+
+        for meas in self.main_measurements:
+            meas.on_start(self.profiler_pid, start_time)
+
         # Terminate Process and close pipe if there are defined
         if self.profile_process:
             self.profile_process.terminate()
@@ -108,7 +111,7 @@ class Profiler:
         # Create Profile Process
         self.profile_process = ProfileProcess(
             profile_pid=self.profiler_pid,
-            measurements=self.measurements,
+            measurements=self.thread_measurements,
             pipe_endpoint=self.child_endpoint)
 
         # Start Process
@@ -122,6 +125,8 @@ class Profiler:
         """
         Stops the current profile run.
         """
+        stop_time = time()
+
         self.parent_endpoint.send(ProfilerState.STOPPED)
 
         process_state = self.parent_endpoint.recv()
@@ -130,6 +135,10 @@ class Profiler:
 
         self.results = self.parent_endpoint.recv()
         self.profile_process.join()
+
+        for meas in self.main_measurements:
+            meas.on_stop(self.profiler_pid, stop_time)
+            self.results[meas.name] = meas.results
 
     def export(self) -> None:
         """
@@ -154,12 +163,10 @@ class Profiler:
         """
         self.start()
 
-        with self.invocation_capture.capture() if self.invocation_capture else nullcontext():
-            func_ret = func(*args, **kwargs)
+        # with self.invocation_capture.capture() if self.invocation_capture else nullcontext():
+        func_ret = func(*args, **kwargs)
 
         self.stop()
-
-        self.results["Invocation Captures"] = self.invocation_capture.invocations
 
         return func_ret
 
