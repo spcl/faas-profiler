@@ -38,14 +38,14 @@ RUN python${RUNTIME_VERSION} -m pip install --upgrade pip
 
 # Install faas-profiler
 ADD dist wheels/
-RUN python${RUNTIME_VERSION} -m pip install --find-links=wheels/ faas_profiler
+RUN python${RUNTIME_VERSION} -m pip install --find-links=wheels/ faas_profiler --target ${FUNCTION_DIR}
 
 # Cop example functions and install dependencies
 ADD examples .
-RUN python${RUNTIME_VERSION} -m pip install -r requirements_function.txt
+RUN python${RUNTIME_VERSION} -m pip install -r requirements_function.txt --target ${FUNCTION_DIR}
 
 # INSTALL AWS LAMBDA
-RUN python${RUNTIME_VERSION} -m pip install awslambdaric
+RUN python${RUNTIME_VERSION} -m pip install awslambdaric --target ${FUNCTION_DIR}
 
 # 3. STAGE: Build final runtime
 FROM python-alpine
