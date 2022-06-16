@@ -1,0 +1,6 @@
+# DO NOT EDIT THE BASE IMAGE
+
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+# Add your function dependent stuff here
