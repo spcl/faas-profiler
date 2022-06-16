@@ -1,19 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-FaaS-Profiler Setup Routine
+FaaS-Profiler CLI setup routine.
 """
+
 import setuptools
 
 with open("requirements.txt", "r") as fh:
     requirements = fh.read().splitlines()
 
 setuptools.setup(
-    name="faas_profiler",
-    version="0.0.1",
-    description="FaaS-Profiler is a software to profile serverless functions.",
-    url="https://github.com/spcl/faas-profiler",
+    name='faas-profiler',
+    version='0.0.1',
+    url='https://github.com/spcl/faas-profiler',
     packages=setuptools.find_packages(),
+    include_package_data=True,
     install_requires=requirements,
-    include_package_data=True
+    entry_points={
+        'console_scripts': [
+            'fp = faas_profiler.__main__:main',
+        ],
+    },
 )
