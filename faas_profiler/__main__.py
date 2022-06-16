@@ -16,7 +16,6 @@ def main():
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
     logging.info("Starting FaaS-Profiler CLI.")
     Fire(CLI)
-    logging.info("Stopped FaaS-Profiler CLI.")
 
 if __name__ == "__main__":
     main()
