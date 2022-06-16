@@ -49,8 +49,3 @@ RUN python${RUNTIME_VERSION} -m pip install -r ${FUNCTION_DIR}/requirements_faas
 
 ADD py_faas_profiler/ ${FUNCTION_DIR}/py_faas_profiler
 RUN python${RUNTIME_VERSION} -m pip install -e ${FUNCTION_DIR}/py_faas_profiler --target ${FUNCTION_DIR}
-
-
-# # Cop example functions and install dependencies
-# ADD examples .
-# RUN python${RUNTIME_VERSION} -m pip install -r requirements_function.txt --target ${FUNCTION_DIR}
