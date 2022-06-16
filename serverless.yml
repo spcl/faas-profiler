@@ -1,21 +1,21 @@
 service: faas-profiler
 frameworkVersion: '3'
-
 provider:
   name: aws
+  architecture: arm64
   ecr:
     images:
-      faas_profiler_image:
-        path: ./
+      hello_world_image:
+        path: functions/hello_world
+        file: Dockerfile.aws
+        buildArgs:
+          BASE_IMAGE: faas_profiler_build_image
+          FUNCTION_DIR: /function
   region: eu-central-1
   stage: dev
-
 functions:
   hello_world:
     image:
-      name: faas_profiler_image
-      command: hello_world.handler
-    events:
-      - httpApi:
-          method: GET
-          path: /hello_world
+      command: function.handler
+      entryPoint: /entry.sh
+      name: hello_world_image
