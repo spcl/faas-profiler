@@ -6,6 +6,9 @@ FaaS-profiler cli module.
 Contains functionality for interacting with the profiler via command line.
 """
 
+from faas_profiler import function_generator
+
+from contextlib import contextmanager
 from subprocess import Popen, PIPE
 from shlex import split
 from time import sleep
@@ -14,6 +17,12 @@ from os import makedirs
 from shutil import copyfile
 
 import logging
+import yaml
+import docker
+
+
+
+PROJECT_ROOT = dirname(dirname(__file__))
 
 def run_command(command, env=None):
     """
@@ -39,69 +48,48 @@ def run_command(command, env=None):
 
     return output
 
-class Generators:
-    logger = logging.getLogger("Generators")
-
-    FUNCTIONS_DIR = join(dirname(dirname(__file__)), "functions")
-    TEMPLATES_DIR = join(dirname(dirname(__file__)), "templates")
-
-    @classmethod
-    def create_function(cls, name, runtime="python3.8") -> bool:
-        cls.logger.info(f"Generate a new function. Name: {name}, runtime: {runtime}")
-        if not exists(cls.FUNCTIONS_DIR):
-            makedirs(cls.FUNCTIONS_DIR)
-
-        function_dir = join(cls.FUNCTIONS_DIR, name)
-        if exists(function_dir):
-            cls.logger.error(f"A function called '{name}' already exists. Abort.")
-            return False
-
-        cls.logger.info(f"CREATE: {function_dir}")
-        makedirs(function_dir)
-
-        handler_file = join(function_dir, "function.py")
-        cls.logger.info(f"CREATE: {handler_file}")
-        copyfile(
-            src=join(cls.TEMPLATES_DIR, "aws_function_template.py"),
-            dst=handler_file)
-
-        dockerfile_aws = join(function_dir, "Dockerfile.aws")
-        cls.logger.info(f"CREATE: {dockerfile_aws}")
-        copyfile(
-            src=join(cls.TEMPLATES_DIR, "Dockerfile.template"),
-            dst=dockerfile_aws)
-
-
-        dockerfile_gcp = join(function_dir, "Dockerfile.gcp")
-        cls.logger.info(f"CREATE: {dockerfile_gcp}")
-        copyfile(
-            src=join(cls.TEMPLATES_DIR, "Dockerfile.template"),
-            dst=dockerfile_gcp)
-
-
-        dockerfile_azure = join(function_dir, "Dockerfile.azure")
-        cls.logger.info(f"CREATE: {dockerfile_azure}")
-        copyfile(
-            src=join(cls.TEMPLATES_DIR, "Dockerfile.template"),
-            dst=dockerfile_azure)
-
-        return True
 
 
 class CLI:
-    logger = logging.getLogger("CLI")
+    _logger = logging.getLogger("CLI")
 
-
-    GENERATORS = {
-        "function": Generators.create_function
+    
+    _GENERATORS = {
+        "function": function_generator.generate
     }
+    _DOCKER_FUNCTIONS_DIR = "/function"
+    _DOCKER_BUILD_IMAGE_NAME = "faas_profiler_build_image"
 
-    @classmethod
-    def generate(cls, generator: str, *args, **kwargs):
-        if generator not in cls.GENERATORS.keys():
-            cls.logger.error(f"No generator found for {generator}. Available: {list(cls.GENERATORS.keys())}")
-            return
-        
-        if cls.GENERATORS[generator](*args, **kwargs):
-            cls.logger.info("Generation successful.")
 
+    def __init__(self) -> None:
+        self._docker = docker.from_env()
+        self._build_image = self._docker.images.get(self._DOCKER_BUILD_IMAGE_NAME)
+
+        self._functions = {}
+
+
+    def build_base_image(self, dockerfile=None, tag=None):
+        """
+        (Re-)Builds the FaaS-Profiler docker build image.
+        """
+        if not dockerfile:
+            dockerfile = join(PROJECT_ROOT, "docker", "aws", "Dockerfile.build")
+
+        self._logger.info(f"Rebuilding profiler base image: {dockerfile}")
+
+        self._build_image = self._docker.images.build(
+            tag=tag if tag else self._DOCKER_BUILD_IMAGE_NAME,
+            path=".",
+            dockerfile=dockerfile,
+            buildargs={
+                'FUNCTION_DIR': self._DOCKER_FUNCTIONS_DIR
+            },
+            quiet=False)
+
+
+    #     if self._GENERATORS[generator](*args, **kwargs, build_image=self._build_image, docker_function_dir=self._DOCKER_FUNCTIONS_DIR):
+    #         self._logger.info("Generation successful.")
+
+
+    def new_function(self, name):
+        function_generator.generate(name, "aws", "python")
