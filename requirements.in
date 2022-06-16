@@ -1,4 +1,5 @@
-schema
-psutil
-mock
-boto3
+# YML support for python
+pyyaml
+
+# Advanced CLI creation and support
+fire
