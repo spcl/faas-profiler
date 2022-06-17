@@ -1,0 +1,11 @@
+# FaaS Profiler Build images configuration
+
+aws:
+  python:
+    build_dockerfile: docker/aws/Dockerfile.python_build
+    distribution_version: 3.12
+    runtime_version: 3.8
+  node:
+    build_dockerfile: docker/aws/Dockerfile.node_build
+    distribution_version: 3.15
+    runtime_version: 16.14.2
