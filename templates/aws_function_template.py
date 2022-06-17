@@ -5,4 +5,6 @@ A AWS Lambda function.
 """
 
 def handler(event, context):
-    pass
+    return {
+        "message": "hello_world"
+    }
