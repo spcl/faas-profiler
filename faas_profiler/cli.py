@@ -6,23 +6,20 @@ FaaS-profiler cli module.
 Contains functionality for interacting with the profiler via command line.
 """
 
-from faas_profiler import function_generator
+from faas_profiler.functions import FunctionGenerator
+from faas_profiler.images import ImageManager
 
-from contextlib import contextmanager
 from subprocess import Popen, PIPE
 from shlex import split
 from time import sleep
-from os.path import dirname, join, exists
-from os import makedirs
-from shutil import copyfile
+from os.path import dirname, join
 
 import logging
-import yaml
-import docker
-
 
 
 PROJECT_ROOT = dirname(dirname(__file__))
+CONFIG_DIR = join(PROJECT_ROOT, "config")
+
 
 def run_command(command, env=None):
     """
@@ -49,47 +46,26 @@ def run_command(command, env=None):
     return output
 
 
-
 class CLI:
     _logger = logging.getLogger("CLI")
 
-    
-    _GENERATORS = {
-        "function": function_generator.generate
-    }
+    _BASE_BUILD_IMAGE_NAME = "fp_{}_build_image_{}-{}"
     _DOCKER_FUNCTIONS_DIR = "/function"
-    _DOCKER_BUILD_IMAGE_NAME = "faas_profiler_build_image"
 
+    @classmethod
+    def _build_image_name(cls, provider, runtime, version):
+        return cls._BASE_BUILD_IMAGE_NAME.format(provider, runtime, version)
 
     def __init__(self) -> None:
-        self._docker = docker.from_env()
-        self._build_image = self._docker.images.get(self._DOCKER_BUILD_IMAGE_NAME)
+        self._image_manager = ImageManager(
+            build_image_file=join(CONFIG_DIR, "build_images.yml"))
 
-        self._functions = {}
+    def init(self, rebuild=False) -> None:
+        self._logger.info("Building base build images for all runtimes.")
+        self._image_manager.rebuild_all_images(force_rebuild=rebuild)
 
-
-    def build_base_image(self, dockerfile=None, tag=None):
+    def new_function(self, name, runtime):
         """
-        (Re-)Builds the FaaS-Profiler docker build image.
+        Generates a new function by calling a FunctionGenerator
         """
-        if not dockerfile:
-            dockerfile = join(PROJECT_ROOT, "docker", "aws", "Dockerfile.build")
-
-        self._logger.info(f"Rebuilding profiler base image: {dockerfile}")
-
-        self._build_image = self._docker.images.build(
-            tag=tag if tag else self._DOCKER_BUILD_IMAGE_NAME,
-            path=".",
-            dockerfile=dockerfile,
-            buildargs={
-                'FUNCTION_DIR': self._DOCKER_FUNCTIONS_DIR
-            },
-            quiet=False)
-
-
-    #     if self._GENERATORS[generator](*args, **kwargs, build_image=self._build_image, docker_function_dir=self._DOCKER_FUNCTIONS_DIR):
-    #         self._logger.info("Generation successful.")
-
-
-    def new_function(self, name):
-        function_generator.generate(name, "aws", "python")
+        FunctionGenerator.generate(name, runtime, self._image_manager, [])
