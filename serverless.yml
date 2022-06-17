@@ -3,19 +3,35 @@ frameworkVersion: '3'
 provider:
   name: aws
   architecture: arm64
-  ecr:
-    images:
-      hello_world_image:
-        path: functions/hello_world
-        file: Dockerfile.aws
-        buildArgs:
-          BASE_IMAGE: faas_profiler_build_image
-          FUNCTION_DIR: /function
   region: eu-central-1
   stage: dev
+  ecr:
+    images:
+      hello_world_py_image:
+        path: functions/hello_world_py
+        file: Dockerfile.aws
+        buildArgs:
+          BASE_IMAGE: fp_aws_build_image_python-3.8:latest
+          FUNCTION_DIR: /function
+      hello_world_js_image:
+        path: functions/hello_world_js
+        file: Dockerfile.aws
+        buildArgs:
+          BASE_IMAGE: fp_aws_build_image_node-16.14.2:latest
+          FUNCTION_DIR: /function
 functions:
-  hello_world:
+  hello_world_py:
     image:
       command: function.handler
-      entryPoint: /entry.sh
-      name: hello_world_image
+      entryPoint:
+      - /usr/local/bin/npx
+      - aws-lambda-ric
+      name: hello_world_py_image
+  hello_world_js:
+    image:
+      command: function.handler
+      entryPoint:
+      - /usr/local/bin/python
+      - -m
+      - awslambdaric
+      name: hello_world_js_image

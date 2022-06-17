@@ -4,10 +4,10 @@
 A AWS Lambda function.
 """
 
-import py_faas_profiler
+import py_faas_profiler as fp
 
+@fp.profile()
 def handler(event, context):
     return {
-        "message": "Hello World",
-        "fp_version": py_faas_profiler.__version__
+        "message": "hello_world"
     }
