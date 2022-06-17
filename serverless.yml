@@ -24,14 +24,14 @@ functions:
     image:
       command: function.handler
       entryPoint:
-      - /usr/local/bin/npx
-      - aws-lambda-ric
+      - /usr/local/bin/python
+      - -m
+      - awslambdaric
       name: hello_world_py_image
   hello_world_js:
     image:
       command: function.handler
       entryPoint:
-      - /usr/local/bin/python
-      - -m
-      - awslambdaric
+      - /usr/local/bin/npx
+      - aws-lambda-ric
       name: hello_world_js_image

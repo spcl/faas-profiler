@@ -145,7 +145,7 @@ class FunctionGenerator(ABC):
 class NodeFunctionGenerator(FunctionGenerator):
 
     handler_command = "function.handler"
-    entry_point = ["/usr/local/bin/python", "-m", "awslambdaric"]
+    entry_point = ["/usr/local/bin/npx", "aws-lambda-ric"]
 
     def copy_function_files(self):
         """
@@ -175,7 +175,7 @@ class NodeFunctionGenerator(FunctionGenerator):
 class PythonFunctionGenerator(FunctionGenerator):
 
     handler_command = "function.handler"
-    entry_point = ["/usr/local/bin/npx", "aws-lambda-ric"]
+    entry_point = ["/usr/local/bin/python", "-m", "awslambdaric"]
 
     def copy_function_files(self) -> str:
         """
