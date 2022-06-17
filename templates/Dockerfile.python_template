@@ -10,6 +10,7 @@ ARG FUNCTION_DIR
 #
 # Add function-dependent operations here...
 #
+ADD function.py ${FUNCTION_DIR}
 
 # Build final runtime
 FROM ${BASE_IMAGE}
@@ -18,6 +19,6 @@ ARG FUNCTION_DIR
 WORKDIR ${FUNCTION_DIR}
 COPY --from=build-image ${FUNCTION_DIR} ${FUNCTION_DIR}
 
-ADD https://github.com/aws/aws-lambda-runtime-interface-emulator/releases/latest/download/aws-lambda-rie /usr/bin/aws-lambda-rie
-COPY entry.sh /
-RUN chmod 755 /usr/bin/aws-lambda-rie /entry.sh
+# ADD https://github.com/aws/aws-lambda-runtime-interface-emulator/releases/latest/download/aws-lambda-rie /usr/bin/aws-lambda-rie
+# COPY entry.sh /
+# RUN chmod 755 /usr/bin/aws-lambda-rie /entry.sh
