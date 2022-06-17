@@ -2,11 +2,8 @@
 #   AWS PYTHON BUILD DOCKER FILE
 #
 
-ARG RUNTIME_VERSION="3.8"
-ARG DISTRO_VERSION="3.12"
-
-ARG FUNCTION_DIR="/function"
-
+ARG RUNTIME_VERSION
+ARG DISTRO_VERSION
 
 # 1. STAGE: Define python-alpine base image
 FROM python:${RUNTIME_VERSION}-alpine${DISTRO_VERSION} AS python-alpine
@@ -19,7 +16,7 @@ FROM python-alpine AS build-image
 
 # Include arguments
 ARG FUNCTION_DIR
-ARG RUNTIME_VERSION="3.8"
+ARG RUNTIME_VERSION
 
 # Install packages
 RUN apk add --no-cache \
