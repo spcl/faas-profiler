@@ -137,7 +137,9 @@ dmypy.json
 # serverless files
 .serverless
 
-
+# Node files
+node_modules
+package-lock.json
 
 # TODO: REMOVE ME 
 .saves
