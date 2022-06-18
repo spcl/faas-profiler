@@ -6,6 +6,7 @@ Base for Measurements.
 Defines abstract base class for all measurements and measuring points
 """
 from __future__ import annotations
+from ctypes import Union
 
 import logging
 
@@ -93,6 +94,104 @@ class ParallelMeasurement(Measurement):
         pass
 
 
+class MeasurementGroup:
+    """
+    TODO:
+    """
+
+    _logger = logging.getLogger("MeasurementGroup")
+
+    @classmethod
+    def make_groups(cls, measurement_list: list):
+        parallel_meas = []
+        base_meas = []
+
+        for measurement in measurement_list:
+            meas_name = measurement.get("name")
+            if meas_name:
+                try:
+                    meas_cls = Measurement.factory(meas_name)
+                except MeasurementError:
+                    return
+                    # TODO log this
+
+                if issubclass(meas_cls, ParallelMeasurement):
+                    parallel_meas.append(
+                        (meas_cls, measurement.get("parameters", {})))
+                else:
+                    base_meas.append(
+                        (meas_cls, measurement.get(
+                            "parameters", {})))
+            else:
+                pass
+                # TODO: log this
+
+        return (
+            MeasurementGroup(parallel_meas),
+            MeasurementGroup(base_meas)
+        )
+
+    def __init__(
+        self,
+        measurements: List[Tuple[Measurement], dict],
+    ) -> None:
+        self.meas_classes, self.meas_params = zip(*measurements)
+        self.meas_instances = []
+
+    def initialize_all(self) -> None:
+        """
+        Initialize all measurements.
+        """
+        self.meas_instances = []
+        for meas_cls in self.meas_classes:
+            try:
+                self.meas_instances.append(meas_cls())
+            except RuntimeError as err:
+                self._logger.error(
+                    f"Initializing {meas_cls.name} failed: {err}")
+
+    def setUp_all(self, profile_context: Type[ProfileContext]) -> None:
+        """
+        Set up all measurements with given parameters.
+        """
+        for meas, params in zip(self.meas_instances, self.meas_params):
+            try:
+                meas.setUp(profile_context, params)
+            except RuntimeError as err:
+                self._logger.error(f"Setting up {meas.name} failed: {err}")
+
+    def start_all(self) -> None:
+        """
+        Starts all measurements.
+        """
+        for meas in self.meas_instances:
+            try:
+                meas.start()
+            except RuntimeError as err:
+                self._logger.error(f"Starting {meas.name} failed: {err}")
+
+    def measure_all(self):
+        """
+        Triggers all measuring methods.
+        """
+        for meas in self.meas_instances:
+            try:
+                meas.measure()
+            except RuntimeError as err:
+                self._logger.error(
+                    f"Calling measure of {meas.name} failed: {err}")
+
+    def stop_all(self):
+        """
+        Stops all measurements.
+        """
+        for meas in self.meas_instances:
+            try:
+                meas.stop()
+            except RuntimeError as err:
+                self._logger.error(f"Stopping {meas.name} failed: {err}")
+
+
 class MeasurementProcess(Process):
     """
     Process to run all measurements that are to be executed in parallel to the main process.
@@ -102,7 +201,7 @@ class MeasurementProcess(Process):
 
     def __init__(
         self,
-        measurements: List[Tuple[ParallelMeasurement], dict],
+        measurement_group: Type[MeasurementGroup],
         profile_context: Type[ProfileContext],
         pipe_endpoint: Type[connection.Connection],
         refresh_interval: float = 0.1
@@ -110,7 +209,9 @@ class MeasurementProcess(Process):
         self.profile_context = profile_context
         self.pipe_endpoint = pipe_endpoint
         self.refresh_interval = refresh_interval
-        self.measurements = self._init_and_setup_measurements(measurements)
+        self.measurement_group = measurement_group
+
+        self.measurement_group.setUp_all(self.profile_context)
 
         super(MeasurementProcess, self).__init__()
 
@@ -124,68 +225,19 @@ class MeasurementProcess(Process):
         """
         self._logger.info("Measurement process started.")
 
-        self._start_measurements()
+        self.measurement_group.start_all()
         self.pipe_endpoint.send(MeasuringState.STARTED)
 
         self._logger.info("Measurement process started measuring.")
 
         state = MeasuringState.STARTED
         while state == MeasuringState.STARTED:
-            self._measure()
+            self.measurement_group.measure_all()
 
             if self.pipe_endpoint.poll(self.refresh_interval):
                 state = self.pipe_endpoint.recv()
 
         self._logger.info("Measurement process stopped measuring.")
 
-        self._stop_measurements()
+        self.measurement_group.stop_all()
         self.pipe_endpoint.send(MeasuringState.STOPPED)
-
-    def _init_and_setup_measurements(self,
-                                     measurements: List[Tuple[ParallelMeasurement],
-                                                        dict]) -> List[Type[ParallelMeasurement]]:
-        measurement_instances = []
-
-        for meas_cls, meas_config in measurements:
-            try:
-                meas_instance = meas_cls()
-                meas_instance.setUp(self.profile_context, meas_config)
-            except RuntimeError as err:
-                self._logger.error(f"Setting up {meas_cls.name} failed: {err}")
-
-        return measurement_instances
-
-    def _start_measurements(self):
-        """
-        Starts all measurements.
-
-        Does not stop on errors while starting measurements, logs errors only.
-        """
-        for meas in self.measurements:
-            try:
-                meas.start()
-            except RuntimeError as err:
-                self._logger.error(f"Starting {meas.name} failed: {err}")
-
-    def _measure(self):
-        """
-        Triggers all measuring methods.
-        """
-        for meas in self.measurements:
-            try:
-                meas.measure()
-            except RuntimeError as err:
-                self._logger.error(
-                    f"Calling measure of {meas.name} failed: {err}")
-
-    def _stop_measurements(self):
-        """
-        Stops all measurements.
-
-        Does not stop on errors while stopping measurements, logs errors only.
-        """
-        for meas in self.measurements:
-            try:
-                meas.stop()
-            except RuntimeError as err:
-                self._logger.error(f"Stopping {meas.name} failed: {err}")
