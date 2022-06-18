@@ -6,10 +6,25 @@ FaaS-Profiler configuration
 
 from os.path import dirname, join, abspath, exists
 from json import load
+from enum import Enum
+from dataclasses import dataclass
 
 ROOT_DIR = abspath(dirname(__file__))
 SHARED_DIR = join(dirname(ROOT_DIR), "shared")
 SCHEMAS_DIR = join(SHARED_DIR, "schemas")
+
+
+@dataclass
+class ProfileContext:
+    """
+    Data classes for the context of the current profile run.
+    """
+    pid: int
+
+
+class MeasuringState(Enum):
+    STARTED = 1
+    STOPPED = 3
 
 
 def load_schema_by_measurement_name(
