@@ -1,3 +1,17 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+FaaS-Profiler for python package
+"""
+
+from .measurements import *
+from .profiler import *
+from .config import *
+import logging
+import sys
+
+logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
 
-__version__ = "0.0.1"
+del logging
+del sys
