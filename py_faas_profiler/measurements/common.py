@@ -35,3 +35,8 @@ class ExecutionTime(ParallelMeasurement):
     def tearDown(self):
         self.start_time: float = None
         self.end_time: float = None
+
+
+@Measurement.register("Common::S3Capture")
+class S3Capture(Measurement):
+    pass
