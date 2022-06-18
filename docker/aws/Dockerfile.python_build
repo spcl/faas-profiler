@@ -45,5 +45,5 @@ ADD /py_faas_profiler/requirements.txt ${FUNCTION_DIR}/requirements_faas_profile
 RUN python${RUNTIME_VERSION} -m pip install -r ${FUNCTION_DIR}/requirements_faas_profiler.txt --target ${FUNCTION_DIR}
 
 ADD py_faas_profiler/ ${FUNCTION_DIR}/py_faas_profiler
-ADD shared/ ${FUNCTION_DIR}}
+ADD shared/ ${FUNCTION_DIR}
 RUN python${RUNTIME_VERSION} -m pip install -e ${FUNCTION_DIR}/py_faas_profiler --target ${FUNCTION_DIR}
