@@ -12,7 +12,7 @@ from multiprocessing import Pipe, connection
 from functools import wraps
 from os import getpid
 
-from py_faas_profiler.measurements import Measurement, MeasurementProcess
+from py_faas_profiler.measurements import Measurement, MeasurementProcess, MeasurementGroup
 from py_faas_profiler.config import ProfileContext, MeasuringState
 
 
@@ -48,15 +48,33 @@ class Profiler:
 
         self.profile_context = ProfileContext(pid=getpid())
 
-        self.measurement_process: Type[MeasurementProcess] = None
-        self.parent_endpoint: Type[connection.Connection] = None
-        self.child_endpoint: Type[connection.Connection] = None
-
-        self.bar = [
-            (Measurement.factory("Common::ExecutionTime"), {"foo": 12})
-        ]
-
         self._logger.info(f"Created new Profiler: {self.profile_context}")
+
+        # REMOVE ME
+        meas = [
+            {
+                "name": "Common::ExecutionTime"
+            },
+            {
+                "name": "Common::S3Capture",
+                "parameters": {}
+            }
+        ]
+        self.parallel_group, self.base_group = MeasurementGroup.make_groups(
+            meas)
+
+        self._logger.info(
+            f"Setting up all measurements in main process: {self.base_group.meas_classes}")
+        self.base_group.setUp_all(self.profile_context)
+
+        # Set up new pipes and process
+        self._logger.info(
+            f"Creating Measuring process for: {self.parallel_group.meas_classes}")
+        self.child_endpoint, self.parent_endpoint = Pipe()
+        self.measurement_process = MeasurementProcess(
+            measurement_group=self.parallel_group,
+            profile_context=self.profile_context,
+            pipe_endpoint=self.child_endpoint)
 
     def __call__(self, func: Type[Callable], *args, **kwargs) -> Any:
         """
@@ -88,7 +106,9 @@ class Profiler:
         """
         self._logger.info(f"Starting Profiler...")
 
-        self._terminate_measuring_process()
+        self._logger.info(f"Starting all measurements in main process.")
+        self.base_group.start_all()
+
         self._start_measuring_process()
 
     def stop(self):
@@ -98,6 +118,9 @@ class Profiler:
         self._logger.info("Stopping Profiler...")
         self._stop_measuring_process()
         self._terminate_measuring_process()
+
+        self._logger.info(f"Stopping all measurements in main process.")
+        self.base_group.stop_all()
 
     def export(self):
         """
@@ -117,14 +140,6 @@ class Profiler:
         """
         TODO:
         """
-        # Set up new pipes and process
-        self._logger.info(f"Creating Measuring process for: {self.bar}")
-        self.child_endpoint, self.parent_endpoint = Pipe()
-        self.measurement_process = MeasurementProcess(
-            measurements=self.bar,
-            profile_context=self.profile_context,
-            pipe_endpoint=self.child_endpoint)
-
         # Start process
         self._logger.info(
             f"Starting Measuring process for: {self.measurement_process}")
@@ -149,7 +164,7 @@ class Profiler:
         """
         TODO:
         """
-        if self.measurement_process:
+        if self.measurement_process and self.measurement_process.is_alive():
             self._logger.info(
                 f"Terminated Measuring process: {self.measurement_process}")
             self.measurement_process.terminate()
