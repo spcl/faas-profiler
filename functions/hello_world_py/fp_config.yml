@@ -1,0 +1,6 @@
+measurements:
+  - name: Common::WallTime
+  - name: Network::Connections
+  - name: Network::IOCounters
+    parameters:
+      per_interface: false
