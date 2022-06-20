@@ -1,0 +1,29 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/memory/usage.schema.json",
+    "title": "Memory Usage",
+    "description": "Measures the memory usage of the function.",
+    "properties": {
+        "averageUsage": {
+            "type": "number"
+        },
+        "measuringPoints": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "timestamp": {
+                        "type": "number"
+                    },
+                    "data": {
+                        "type": "number"
+                    }
+                },
+                "required": [
+                    "timestamp",
+                    "data"
+                ]
+            }
+        }
+    }
+}

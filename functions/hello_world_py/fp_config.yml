@@ -4,3 +4,6 @@ measurements:
   - name: Network::IOCounters
     parameters:
       per_interface: false
+  - name: Memory::Usage
+    parameters:
+      include_children: false

@@ -8,3 +8,4 @@ from .base import *
 from .common import *
 from .disk import *
 from .network import *
+from .memory import *
