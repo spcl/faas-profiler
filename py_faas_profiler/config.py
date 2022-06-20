@@ -8,7 +8,7 @@ from os.path import dirname, join, abspath, exists
 from json import load
 from enum import Enum
 from dataclasses import dataclass
-from typing import Type
+from typing import Any, Type
 import uuid
 
 ROOT_DIR = abspath(dirname(__file__))
@@ -27,6 +27,16 @@ class ProfileContext:
     profile_run_id: Type[uuid.UUID]
     profile_run_tmp_dir: str
     pid: int
+    measurement_process_pid: int = None
+
+
+@dataclass
+class MeasuringPoint:
+    """
+    Data class for measuring points during parallel measurements
+    """
+    timestamp: int
+    data: Any
 
 
 class MeasuringState(Enum):
