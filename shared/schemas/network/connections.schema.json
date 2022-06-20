@@ -1,0 +1,31 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/network/connections.schema.json",
+    "title": "Network Connections",
+    "description": "Measures the Network Connections opened by the function to be measured.",
+    "properties": {
+        "connections": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "socket_descriptor": {
+                        "type": "integer"
+                    },
+                    "family": {
+                        "type": "string"
+                    },
+                    "local_address": {
+                        "type": "string"
+                    },
+                    "remote_address": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "socket_descriptor"
+                ]
+            }
+        }
+    }
+}
