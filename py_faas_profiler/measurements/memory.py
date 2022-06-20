@@ -14,7 +14,7 @@ from time import time
 from dataclasses import asdict
 
 from py_faas_profiler.measurements.base import ParallelMeasurement, register_with_name
-from py_faas_profiler.config import ProfileContext, MeasuringPoint
+from py_faas_profiler.config import ProfileContext, MeasuringPoint, average_measuring_points
 
 
 @register_with_name("Memory::Usage")
@@ -46,11 +46,7 @@ class Usage(ParallelMeasurement):
         self._append_new_memory_measurement()
 
     def tearDown(self) -> None:
-        self._average_usage = reduce(lambda a,
-                                     b: a + b.data,
-                                     self._measuring_points,
-                                     0) / len(self._measuring_points)
-
+        self._average_usage = average_measuring_points(self._measuring_points)
         del self.process
 
     def results(self) -> dict:

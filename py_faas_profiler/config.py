@@ -8,7 +8,8 @@ from os.path import dirname, join, abspath, exists
 from json import load
 from enum import Enum
 from dataclasses import dataclass
-from typing import Any, Type
+from typing import Any, List, Type
+from functools import reduce
 import uuid
 
 ROOT_DIR = abspath(dirname(__file__))
@@ -37,6 +38,17 @@ class MeasuringPoint:
     """
     timestamp: int
     data: Any
+
+
+def average_measuring_points(points: List[MeasuringPoint]) -> Any:
+    """
+    Calculates the average value of a list of measurement points,
+    with the assumption that the "data" property is addable.
+    """
+    return reduce(
+        lambda total, point: total + point.data,
+        points,
+        0) / len(points)
 
 
 class MeasuringState(Enum):
