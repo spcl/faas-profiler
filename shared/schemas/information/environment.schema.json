@@ -1,0 +1,29 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/information/environment.schema.json",
+    "title": "Environment Information",
+    "description": "Extracts information about the runtime",
+    "properties": {
+        "runtime": {
+            "type": [
+                "string",
+                "object"
+            ]
+        },
+        "platform": {
+            "type": "string"
+        },
+        "interpreterPath": {
+            "type": "string"
+        },
+        "byteOrder": {
+            "type": "string"
+        },
+        "packages": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        }
+    }
+}

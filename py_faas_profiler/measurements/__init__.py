@@ -10,3 +10,4 @@ from .disk import *
 from .network import *
 from .memory import *
 from .cpu import *
+from .information import *

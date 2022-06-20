@@ -1,0 +1,23 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/information/operating_system.schema.json",
+    "title": "Operation System Information",
+    "description": "Extracts information about the OS",
+    "properties": {
+        "bootTime": {
+            "type": "string"
+        },
+        "system": {
+            "type": "string"
+        },
+        "nodeName": {
+            "type": "string"
+        },
+        "release": {
+            "type": "string"
+        },
+        "machine": {
+            "type": "string"
+        }
+    }
+}
