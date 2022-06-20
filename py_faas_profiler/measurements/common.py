@@ -6,12 +6,10 @@ Module for common measurements:
 """
 
 from time import time
-from typing import TYPE_CHECKING, Type
+from typing import Type
 
 from py_faas_profiler.measurements.base import ParallelMeasurement, register_with_name
-
-if TYPE_CHECKING:
-    from py_faas_profiler.config import ProfileContext
+from py_faas_profiler.config import ProfileContext
 
 
 @register_with_name("Common::WallTime")
