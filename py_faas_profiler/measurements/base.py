@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 import json
 
 import logging
-from unittest import result
+import os
 import warnings
 
 from os.path import join
@@ -274,7 +274,10 @@ class MeasurementProcess(Process):
         Stops when the main process tells it to do so.
         Then stops all measurements and sends the results to the main process.
         """
-        self._logger.info("Measurement process started.")
+        measurement_process_pid = os.getpid()
+        self._logger.info(
+            f"Measurement process started (pid={measurement_process_pid}).")
+        self.profile_context.measurement_process_pid = measurement_process_pid
 
         self.measurement_group.setUp_all(self.profile_context)
         self.measurement_group.start_all()
