@@ -7,3 +7,6 @@ measurements:
   - name: Memory::Usage
     parameters:
       include_children: false
+  - name: CPU::Usage
+    parameters:
+      include_children: false
