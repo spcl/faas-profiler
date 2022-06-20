@@ -2,17 +2,20 @@
 # -*- coding: utf-8 -*-
 """
 Module for common measurements:
-- ExecutionTime
+- WallTime
 """
 
 from time import time
 from typing import TYPE_CHECKING, Type
-from py_faas_profiler.measurements.base import Measurement, ParallelMeasurement
-from py_faas_profiler.config import ProfileContext
+
+from py_faas_profiler.measurements.base import ParallelMeasurement, register_with_name
+
+if TYPE_CHECKING:
+    from py_faas_profiler.config import ProfileContext
 
 
-@Measurement.register("Common::ExecutionTime")
-class ExecutionTime(ParallelMeasurement):
+@register_with_name("Common::WallTime")
+class WallTime(ParallelMeasurement):
     """
     Measures the execution time of the function using the Python standard time library.
 
@@ -20,11 +23,14 @@ class ExecutionTime(ParallelMeasurement):
     """
 
     def setUp(
-            self,
-            profiler_context: Type[ProfileContext],
-            config: dict = {}) -> None:
+        self,
+        profiler_context: Type[ProfileContext],
+        config: dict = {}
+    ) -> None:
         self.start_time: float = None
         self.end_time: float = None
+
+        self._results = {}
 
     def start(self) -> None:
         self.start_time = time()
@@ -33,10 +39,10 @@ class ExecutionTime(ParallelMeasurement):
         self.end_time = time()
 
     def tearDown(self):
-        self.start_time: float = None
-        self.end_time: float = None
+        self._results = {"wallTime": self.end_time - self.start_time}
 
+        del self.start_time
+        del self.end_time
 
-@Measurement.register("Common::S3Capture")
-class S3Capture(Measurement):
-    pass
+    def results(self) -> dict:
+        return self._results
