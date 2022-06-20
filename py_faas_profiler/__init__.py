@@ -10,7 +10,7 @@ from .config import *
 import logging
 import sys
 
-logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+logging.basicConfig(stream=sys.stdout)
 
 
 del logging

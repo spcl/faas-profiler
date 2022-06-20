@@ -13,9 +13,8 @@ from typing import Type, Callable, Any
 from multiprocessing import Pipe
 from functools import wraps
 from os import getpid, mkdir, path
-from measurements.base import MeasurementError
 
-
+from py_faas_profiler.measurements.base import MeasurementError
 from py_faas_profiler.measurements import MeasurementProcess, MeasurementGroup
 from py_faas_profiler.config import ProfileContext, MeasuringState, TMP_RESULT_DIR
 
@@ -80,8 +79,6 @@ class Profiler:
         """
         self._make_tmp_result_dir()
         self._update_profile_context()
-
-        self._logger.info("Start patching")
 
         self.start()
         try:
