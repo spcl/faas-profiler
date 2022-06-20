@@ -12,7 +12,11 @@ inflection==0.5.1
     # via -r py_faas_profiler/requirements.in
 jsonschema==4.6.0
     # via -r py_faas_profiler/requirements.in
+psutil==5.9.1
+    # via -r py_faas_profiler/requirements.in
 pyrsistent==0.18.1
     # via jsonschema
+pyyaml==6.0
+    # via -r py_faas_profiler/requirements.in
 zipp==3.8.0
     # via importlib-resources
