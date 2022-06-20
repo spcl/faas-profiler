@@ -5,18 +5,22 @@ TODO:
 """
 
 import logging
+import uuid
 import warnings
+import yaml
 
-from typing import List, Type, Callable, Any
-from multiprocessing import Pipe, connection
+from typing import Type, Callable, Any
+from multiprocessing import Pipe
 from functools import wraps
-from os import getpid
-
-from py_faas_profiler.measurements import Measurement, MeasurementProcess, MeasurementGroup
-from py_faas_profiler.config import ProfileContext, MeasuringState
+from os import getpid, mkdir, path
+from measurements.base import MeasurementError
 
 
-def profile(config: str = None):
+from py_faas_profiler.measurements import MeasurementProcess, MeasurementGroup
+from py_faas_profiler.config import ProfileContext, MeasuringState, TMP_RESULT_DIR
+
+
+def profile(config_file: str = None):
     """
     FaaS Profiler decorator.
     Use this decorator to profile a serverless function.
@@ -30,7 +34,7 @@ def profile(config: str = None):
     def function_profiler(func):
         @wraps(func)
         def profiler_wrapper(*args, **kwargs):
-            profiler = Profiler(config_file=config)
+            profiler = Profiler(config_file=config_file)
 
             function_return = profiler(func, *args, **kwargs)
 
@@ -42,34 +46,27 @@ def profile(config: str = None):
 class Profiler:
 
     _logger = logging.getLogger("Profiler")
+    _logger.setLevel(logging.INFO)
 
-    def __init__(self, config_file) -> None:
-        self.config_file = config_file
+    def __init__(self, config_file: str = None) -> None:
+        self.measurement_config, self.patcher_config, self.exporter_config = self._load_configuration(
+            config_file)
 
-        self.profile_context = ProfileContext(pid=getpid())
-
-        self._logger.info(f"Created new Profiler: {self.profile_context}")
-
-        # REMOVE ME
-        meas = [
-            {
-                "name": "Common::ExecutionTime"
-            },
-            {
-                "name": "Common::S3Capture",
-                "parameters": {}
-            }
-        ]
         self.parallel_group, self.base_group = MeasurementGroup.make_groups(
-            meas)
+            self.measurement_config)
 
-        self._logger.info(
-            f"Setting up all measurements in main process: {self.base_group.meas_classes}")
+        self.profile_run_id = uuid.uuid4()
+        self.profile_run_tmp_dir = path.join(
+            TMP_RESULT_DIR, f"faas_profiler_{self.profile_run_id}_results")
+
+        self.profile_context = ProfileContext(
+            profile_run_id=self.profile_run_id,
+            profile_run_tmp_dir=self.profile_run_tmp_dir,
+            pid=getpid())
+
         self.base_group.setUp_all(self.profile_context)
 
         # Set up new pipes and process
-        self._logger.info(
-            f"Creating Measuring process for: {self.parallel_group.meas_classes}")
         self.child_endpoint, self.parent_endpoint = Pipe()
         self.measurement_process = MeasurementProcess(
             measurement_group=self.parallel_group,
@@ -81,7 +78,10 @@ class Profiler:
         Convenience wrapper to profile the given method.
         Profiles the given method and exports the results.
         """
+        self._make_tmp_result_dir()
         self._update_profile_context()
+
+        self._logger.info("Start patching")
 
         self.start()
         try:
@@ -117,10 +117,16 @@ class Profiler:
         """
         self._logger.info("Stopping Profiler...")
         self._stop_measuring_process()
-        self._terminate_measuring_process()
 
         self._logger.info(f"Stopping all measurements in main process.")
         self.base_group.stop_all()
+
+        self.base_group.tearDown_all()
+
+        self._logger.info("Wait Measuring process stopped.")
+        self.measurement_process.join()
+
+        self._terminate_measuring_process()
 
     def export(self):
         """
@@ -135,6 +141,17 @@ class Profiler:
         Updates the Profile Context based on the passing arguments.
         """
         # TODO: IMPLEMENT ME
+        self.profile_context
+
+    def _make_tmp_result_dir(self):
+        """
+        Creates a temporary folder for results.
+        """
+        try:
+            mkdir(self.profile_run_tmp_dir)
+        except OSError as err:
+            raise MeasurementError(
+                f"Could not create temporary results dir: {err}")
 
     def _start_measuring_process(self):
         """
@@ -157,9 +174,6 @@ class Profiler:
         self.parent_endpoint.send(MeasuringState.STOPPED)
         self.parent_endpoint.recv()
 
-        self._logger.info("Wait Measuring process stopped.")
-        self.measurement_process.join()
-
     def _terminate_measuring_process(self):
         """
         TODO:
@@ -176,3 +190,16 @@ class Profiler:
         if self.child_endpoint:
             self._logger.info(f"Closed child pipe: {self.child_endpoint}")
             self.child_endpoint.close()
+
+    def _load_configuration(self, config_file_path: str = None) -> dict:
+        if config_file_path is None:
+            # TODO: Load default
+            return {}, {}, {}
+
+        with open(config_file_path, 'r') as fh:
+            all_config = yaml.safe_load(fh)
+
+            return (
+                all_config.get("measurements"),
+                all_config.get("patchers"),
+                all_config.get("exporters"))
