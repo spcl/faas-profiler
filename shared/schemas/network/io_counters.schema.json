@@ -1,0 +1,51 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/network/connections.schema.json",
+    "title": "Network IO Counters",
+    "description": "Measures the Network IO counters during the function execution by snapshotting.",
+    "properties": {
+        "interfaces": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "interface": {
+                        "type": "string"
+                    },
+                    "bytes_sent": {
+                        "type": "integer"
+                    },
+                    "bytes_recv": {
+                        "type": "integer"
+                    },
+                    "packets_sent": {
+                        "type": "integer"
+                    },
+                    "packets_recv": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "interface"
+                ]
+            }
+        },
+        "total": {
+            "type": "object",
+            "properties": {
+                "bytes_sent": {
+                    "type": "integer"
+                },
+                "bytes_recv": {
+                    "type": "integer"
+                },
+                "packets_sent": {
+                    "type": "integer"
+                },
+                "packets_recv": {
+                    "type": "integer"
+                }
+            }
+        }
+    }
+}
