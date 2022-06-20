@@ -10,3 +10,5 @@ measurements:
   - name: CPU::Usage
     parameters:
       include_children: false
+  - name: Information::Environment
+  - name: Information::OperatingSystem
