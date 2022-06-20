@@ -8,10 +8,15 @@ from os.path import dirname, join, abspath, exists
 from json import load
 from enum import Enum
 from dataclasses import dataclass
+from typing import Type
+import uuid
 
 ROOT_DIR = abspath(dirname(__file__))
 SHARED_DIR = join(dirname(ROOT_DIR), "shared")
 SCHEMAS_DIR = join(SHARED_DIR, "schemas")
+
+# TODO: make case dest for AWS, local usw
+TMP_RESULT_DIR = abspath("/tmp")
 
 
 @dataclass
@@ -19,6 +24,8 @@ class ProfileContext:
     """
     Data classes for the context of the current profile run.
     """
+    profile_run_id: Type[uuid.UUID]
+    profile_run_tmp_dir: str
     pid: int
 
 
@@ -29,7 +36,7 @@ class MeasuringState(Enum):
 
 def load_schema_by_measurement_name(
     name: str,
-    file_ext: str = ".schema"
+    file_ext: str = ".schema.json"
 ) -> dict:
     """
     Loads a measurement result scheme for the given measurement names.
