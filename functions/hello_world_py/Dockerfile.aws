@@ -10,7 +10,11 @@ ARG FUNCTION_DIR
 #
 # Add function-dependent operations here...
 #
+ADD requirements.txt ${FUNCTION_DIR}/requirements.txt
+RUN python${RUNTIME_VERSION} -m pip install -r ${FUNCTION_DIR}/requirements.txt --target ${FUNCTION_DIR}
+
 ADD function.py ${FUNCTION_DIR}
+ADD fp_config.yml ${FUNCTION_DIR}
 
 # Build final runtime
 FROM ${BASE_IMAGE}
