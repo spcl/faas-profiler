@@ -5,20 +5,20 @@ Base for Measurements.
 
 Defines abstract base class for all measurements and measuring points
 """
-from __future__ import annotations
-from abc import ABC, abstractmethod
-import json
 
+from __future__ import annotations
+
+import json
 import logging
 import os
 import warnings
 
 from os.path import join
-from typing import Dict, List, Tuple, Type
+from typing import List, Tuple, Type
 from multiprocessing import Process, connection
-from inflection import underscore
 from jsonschema import validate, ValidationError
 
+from py_faas_profiler.utilis import Registerable
 from py_faas_profiler.config import ProfileContext, MeasuringState, load_schema_by_measurement_name
 
 
@@ -26,41 +26,12 @@ class MeasurementError(RuntimeError):
     pass
 
 
-class Measurement(ABC):
+class Measurement(Registerable):
     """
     Base class for all measurements in FaaS Profiler.
 
     Cannot be initialised.
     """
-    _measurements_: Dict[str, Measurement] = {}
-
-    name: str = ""
-    name_parts: tuple = tuple()
-    key: str = ""
-
-    #
-    # Measurement factory methods
-    #
-
-    @classmethod
-    def register_with_name(cls, name, module_delimiter: str = "::"):
-        def decorator(subclass):
-            cls._measurements_[name] = subclass
-            subclass.name = name
-            subclass.name_parts = tuple(underscore(part)
-                                        for part in name.split(module_delimiter))
-            subclass.key = "_".join(subclass.name_parts)
-
-            return subclass
-        return decorator
-
-    @classmethod
-    def factory(cls, name):
-        try:
-            return cls._measurements_[name]
-        except KeyError:
-            raise MeasurementError(
-                f"Unknown measurement name {name}. Available measurements: {list(cls._measurements_.keys())}")
 
     def __init__(
         self,
@@ -99,7 +70,6 @@ class Measurement(ABC):
         """
         pass
 
-    @abstractmethod
     def results(self) -> dict:
         return {}
 
@@ -135,7 +105,7 @@ class ParallelMeasurement(Measurement):
         pass
 
 
-register_with_name = Measurement.register_with_name
+register_with_name = Measurement.register
 
 
 class MeasurementGroup:
@@ -156,7 +126,7 @@ class MeasurementGroup:
             if meas_name:
                 try:
                     meas_cls = Measurement.factory(meas_name)
-                except MeasurementError:
+                except ValueError:
                     continue
                     # TODO log this
 
