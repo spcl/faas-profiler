@@ -15,6 +15,7 @@ from py_faas_profiler.captures.base import Capture
 from py_faas_profiler.measurements import MeasurementProcess, MeasurementGroup
 from py_faas_profiler.config import Config, ProfileContext, MeasuringState
 from py_faas_profiler.exporter import ResultsCollector, Exporter
+from py_faas_profiler.patchers import unpatch_modules
 
 
 def profile(config_file: str = None):
@@ -71,6 +72,13 @@ class Profiler:
         self.parent_endpoint: Type[connection.Connection] = None
         self.measurement_process: Type[MeasurementProcess] = None
 
+        self._logger.info((
+            "[PROFILER PLAN]: \n"
+            f"- Measurements: {self.config.measurements} \n"
+            f"- Captures: {self.config.captures} \n"
+            f"- Exporters: {self.config.exporters}"
+        ))
+
     def __call__(self, func: Type[Callable], *args, **kwargs) -> Any:
         """
         Convenience wrapper to profile the given method.
@@ -125,7 +133,8 @@ class Profiler:
 
         results_collector = ResultsCollector(
             config=self.config,
-            profile_context=self.profile_context)
+            profile_context=self.profile_context,
+            captures=self.active_captures)
 
         for config_item in self.config.exporters:
             try:
@@ -246,26 +255,23 @@ class Profiler:
             self.child_endpoint.close()
 
     def _start_capturing_and_tracing(self):
-        pass
-        # for capture_conf in self.capture_config:
-        #     capture_name = capture_conf.get("name")
-        #     if capture_name:
-        #         try:
-        #             capt_cls = Capture.factory(capture_name)
-        #         except ValueError:
-        #             # TODO: log this
-        #             continue
+        for capture_conf in self.config.captures:
+            try:
+                capture_class = Capture.factory(capture_conf.name)
+            except ValueError:
+                self._logger.warn(
+                    f"[CAPTURES]: Could not find a capture with name: {capture_conf.name}")
+            else:
+                capture = capture_class(capture_conf.parameters)
+                capture.start()
 
-        #         self._logger.info(f"Started capture {capt_cls}.")
-        #         capture = capt_cls()
-        #         capture.start()
-
-        #         self.active_captures.append(capture)
+                self.active_captures.append(capture)
+        self._logger.info("[CAPTURES]: Started all captures")
 
     def _stop_capturing_and_tracing(self):
-        pass
-        # for capture in self.active_captures:
-        #     self._logger.info(f"Stopped capture {capture.__class__}.")
-        #     capture.stop()
+        for patcher in self.active_captures:
+            patcher.stop()
+        self._logger.info("[CAPTURES]: Stopped all captures")
 
-        #     print(capture.results())
+        unpatch_modules()
+        self._logger.info("[CAPTURES]: Unpatched all modules.")
