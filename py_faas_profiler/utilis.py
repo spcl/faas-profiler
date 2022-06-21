@@ -6,6 +6,14 @@ from typing import Dict
 from inflection import underscore
 
 
+def registerable_name_parts(name, delimiter: str = "::") -> tuple:
+    return tuple(underscore(part) for part in name.split(delimiter))
+
+
+def registerable_key(name, delimiter: str = "::", ) -> str:
+    return "_".join(registerable_name_parts(name, delimiter))
+
+
 class Registerable:
 
     _names_: Dict[str, Registerable] = {}
@@ -19,9 +27,9 @@ class Registerable:
         def decorator(subclass):
             cls._names_[name] = subclass
             subclass.name = name
-            subclass.name_parts = tuple(underscore(part)
-                                        for part in name.split(module_delimiter))
-            subclass.key = "_".join(subclass.name_parts)
+            subclass.name_parts = registerable_name_parts(
+                name, module_delimiter)
+            subclass.key = registerable_key(name, module_delimiter)
 
             return subclass
         return decorator
@@ -32,4 +40,4 @@ class Registerable:
             return cls._names_[name]
         except KeyError:
             raise ValueError(
-                f"Unknown measurement name {name}. Available measurements: {list(cls._measurements_.keys())}")
+                f"Unknown measurement name {name}. Available measurements: {list(cls._names_.keys())}")
