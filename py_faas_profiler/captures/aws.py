@@ -16,11 +16,12 @@ from py_faas_profiler.captures.base import Capture, register_with_name
 @register_with_name("AWS::S3Capture")
 class S3Capture(Capture):
 
-    def __init__(self) -> None:
+    def __init__(self, config: dict = {}) -> None:
         self.patcher = patch_module("botocore")
         self._s3_captures = []
 
     def start(self):
+        self.patcher.start()
         self.patcher.add_capture_observer(self)
 
     def __call__(
@@ -29,6 +30,9 @@ class S3Capture(Capture):
         aws_api_call: Type[AWSApiCall],
         aws_api_response: Type[AWSApiResponse]
     ) -> None:
+        if aws_api_response is None or aws_api_response is None:
+            return
+
         if aws_api_call.service != "s3":
             return
 
@@ -47,8 +51,12 @@ class S3Capture(Capture):
 
     def stop(self) -> None:
         self.patcher.remove_capture_observer(self)
+        self.patcher.stop()
 
-    def results(self) -> dict:
-        return {
-            "invocations": self._s3_captures
-        }
+    def invocations(self) -> list:
+        return self._s3_captures
+
+
+@register_with_name("AWS::EFSCapture")
+class EFSCapture(Capture):
+    pass

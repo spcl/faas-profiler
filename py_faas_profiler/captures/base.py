@@ -13,6 +13,9 @@ from py_faas_profiler.utilis import Registerable
 
 class Capture(Registerable):
 
+    def __init__(self, config: dict = {}) -> None:
+        pass
+
     def start(self) -> None:
         pass
 
@@ -27,8 +30,8 @@ class Capture(Registerable):
     def stop(self) -> None:
         pass
 
-    def results(self) -> dict:
-        return {}
+    def invocations(self) -> list:
+        return []
 
 
 register_with_name = Capture.register
