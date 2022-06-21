@@ -9,6 +9,8 @@ jsonschema
 ## Package to create safely keys
 inflection
 
+## Packge for monkey patching support
+wrapt
 
 # --- Measurements packages --
 psutil
