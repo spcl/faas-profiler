@@ -7,32 +7,19 @@ Module for base patchers.
 from __future__ import annotations
 
 import logging
+import importlib
 
 from dataclasses import dataclass
-import importlib
+from collections import namedtuple
 from time import time
-from typing import Any, Callable, Dict, List, Type
+from typing import Any, Callable, List, Type
 from functools import partial
 from threading import Lock
-from wrapt import ObjectProxy, wrap_function_wrapper
+from wrapt import wrap_function_wrapper
 
 
 class RequiredModuleMissingError(RuntimeError):
     pass
-
-
-@dataclass
-class PatchedFunction:
-    module_name: str
-    function_name: str
-    before_invocation: Callable = None
-    after_invocation: Callable = None
-
-
-@dataclass
-class TracedInstance:
-    module_name: str
-    class_name: str
 
 
 @dataclass
@@ -50,6 +37,10 @@ class BasePatcher:
     target_module: str = None
     patch_only_on_import: bool = False
 
+    PatchedFunction = namedtuple(
+        'PatchedFunction',
+        'module_name class_name function_name before_invocation after_invocation')
+
     @property
     def patched_functions(self) -> list[Type[PatchedFunction]]:
         return []
@@ -58,11 +49,10 @@ class BasePatcher:
         self._lock = Lock()
         self._patch_active: bool = False
 
+        self._patched_functions: List[BasePatcher.PatchedFunction] = []
         self._capture_oberservers = set()
 
         self.target_module = self._import_target_module()
-
-        self.patch()
 
     def add_capture_observer(self, observer):
         if not callable(observer):
@@ -75,23 +65,69 @@ class BasePatcher:
         if oberserver in self._capture_oberservers:
             self._capture_oberservers.remove(oberserver)
 
+    def add_patch_function(
+        self,
+        module_name: str,
+        function_name: str,
+        before_invocation: Callable = None,
+        after_invocation: Callable = None
+    ) -> None:
+        a, *b = function_name.split(".")
+        _function_name = b[0] if b else a
+        _class_name = a if b else None
+
+        self._patched_functions.append(BasePatcher.PatchedFunction(
+            module_name=module_name,
+            class_name=_class_name,
+            function_name=_function_name,
+            before_invocation=before_invocation,
+            after_invocation=after_invocation))
+
+        wrap_function_wrapper(
+            module=module_name,
+            name=function_name,
+            wrapper=partial(self._function_wrapper,
+                            before_invocation=before_invocation,
+                            after_invocation=after_invocation))
+
     def patch(self):
-        if getattr(self.target_module, "_fp_patched", False):
-            return
-
-        setattr(self.target_module, "_fp_patched", True)
-
-        for function_patch in self.patched_functions:
-            wrap_function_wrapper(
-                module=function_patch.module_name,
-                name=function_patch.function_name,
-                wrapper=partial(
-                    self._function_wrapper,
-                    before_invocation=function_patch.before_invocation,
-                    after_invocation=function_patch.after_invocation))
+        pass
 
     def unpatch(self):
         pass
+
+    def start(self):
+        if self._patch_active:
+            return
+
+        self.patch()
+        self._patch_active = True
+
+    def stop(self):
+        if not self._patch_active:
+            return
+
+        self.unpatch()
+        self._unpatch_functions()
+        self._patch_active = False
+
+    def _unpatch_functions(self):
+        for patched_function in self._patched_functions:
+            module = importlib.import_module(patched_function.module_name)
+            if patched_function.class_name:
+                klass = getattr(module, patched_function.class_name)
+                func_wrapper = getattr(klass, patched_function.function_name)
+
+                setattr(
+                    klass,
+                    patched_function.function_name,
+                    func_wrapper.__wrapped__)
+            else:
+                func_wrapper = getattr(module, patched_function.function_name)
+                setattr(
+                    module,
+                    patched_function.function_name,
+                    func_wrapper.__wrapped__)
 
     def _function_wrapper(
         self,

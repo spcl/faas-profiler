@@ -43,15 +43,12 @@ class Patcher(base.BasePatcher):
     target_module: str = "botocore"
     patch_only_on_import: bool = True
 
-    @property
-    def patched_functions(self) -> list:
-        return [
-            base.PatchedFunction(
-                "botocore.client",
-                "BaseClient._make_api_call",
-                before_invocation=self.extract_call_information,
-                after_invocation=self.extract_return_information),
-        ]
+    def patch(self):
+        self.add_patch_function(
+            "botocore.client",
+            "BaseClient._make_api_call",
+            before_invocation=self.extract_call_information,
+            after_invocation=self.extract_return_information)
 
     def extract_call_information(
         self,
