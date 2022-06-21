@@ -4,15 +4,16 @@
 Module for exporting and collecting results.
 """
 
-from functools import cached_property
 import json
 import yaml
 import logging
-
 import boto3
 
 from os import path
+from functools import cached_property
 from typing import Any, List, Type
+
+from py_faas_profiler.captures.base import Capture
 from py_faas_profiler.config import Config, ProfileContext, get_faas_profiler_version
 from py_faas_profiler.utilis import Registerable, registerable_key
 
@@ -41,10 +42,12 @@ class ResultsCollector:
     def __init__(
         self,
         config: Type[Config],
-        profile_context: Type[ProfileContext]
+        profile_context: Type[ProfileContext],
+        captures: List[Type[Capture]]
     ) -> None:
         self.config = config
         self.profile_context = profile_context
+        self.captures = captures
 
     @cached_property
     def raw_data(self) -> list:
@@ -52,11 +55,17 @@ class ResultsCollector:
             "profile_run_id": str(self.profile_context.profile_run_id),
             "py_faas_version": get_faas_profiler_version(),
             "measurements": self._collect_results(self.config.measurements),
-            "captures": self._collect_results(self.config.captures)
+            "captures": self._collect_capture_results()
         }
 
     def format(self, formatter=json_formatter) -> Any:
         return formatter(self.raw_data)
+
+    def _collect_capture_results(self):
+        return [{
+            "name": c.name,
+            "invocations": c.invocations()
+        } for c in self.captures]
 
     def _collect_results(
             self, config_item_list: List[Type[Config.ConfigItem]]) -> list:
