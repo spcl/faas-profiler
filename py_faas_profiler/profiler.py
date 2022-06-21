@@ -6,7 +6,6 @@ TODO:
 
 import logging
 import uuid
-import warnings
 import yaml
 
 from typing import Type, Callable, Any
@@ -14,6 +13,7 @@ from multiprocessing import Pipe
 from functools import wraps
 from os import getpid, mkdir, path
 
+from py_faas_profiler.captures.base import Capture
 from py_faas_profiler.measurements.base import MeasurementError
 from py_faas_profiler.measurements import MeasurementProcess, MeasurementGroup
 from py_faas_profiler.config import ProfileContext, MeasuringState, TMP_RESULT_DIR
@@ -48,11 +48,13 @@ class Profiler:
     _logger.setLevel(logging.INFO)
 
     def __init__(self, config_file: str = None) -> None:
-        self.measurement_config, self.patcher_config, self.exporter_config = self._load_configuration(
+        self.measurement_config, self.capture_config, self.exporter_config = self._load_configuration(
             config_file)
 
         self.parallel_group, self.base_group = MeasurementGroup.make_groups(
             self.measurement_config)
+
+        self.active_captures = []
 
         self.profile_run_id = uuid.uuid4()
         self.profile_run_tmp_dir = path.join(
@@ -81,16 +83,15 @@ class Profiler:
         self._update_profile_context()
 
         self.start()
+        self._logger.info(f"-- EXECUTING FUNCTION: {func.__name__} --")
         try:
-            self._logger.info(f"-- EXECUTING FUNCTION: {func.__name__} --")
             func_ret = func(*args, **kwargs)
-            self._logger.info(f"-- FUNCTION EXCUTED --")
         except Exception as ex:
             self._logger.error(f"Function not successfully executed: {ex}")
-            warnings.warn(ex)
 
             func_ret = None
         finally:
+            self._logger.info(f"-- FUNCTION EXCUTED --")
             self.stop()
 
         self.export()
@@ -102,6 +103,8 @@ class Profiler:
         Starts the profiling.
         """
         self._logger.info(f"Starting Profiler...")
+
+        self._start_capturing_and_tracing()
 
         self._logger.info(f"Starting all measurements in main process.")
         self.base_group.start_all()
@@ -119,6 +122,8 @@ class Profiler:
         self.base_group.stop_all()
 
         self.base_group.tearDown_all()
+
+        self._stop_capturing_and_tracing()
 
         self._logger.info("Wait Measuring process stopped.")
         self.measurement_process.join()
@@ -198,5 +203,28 @@ class Profiler:
 
             return (
                 all_config.get("measurements"),
-                all_config.get("patchers"),
+                all_config.get("captures"),
                 all_config.get("exporters"))
+
+    def _start_capturing_and_tracing(self):
+        for capture_conf in self.capture_config:
+            capture_name = capture_conf.get("name")
+            if capture_name:
+                try:
+                    capt_cls = Capture.factory(capture_name)
+                except ValueError:
+                    # TODO: log this
+                    continue
+
+                self._logger.info(f"Started capture {capt_cls}.")
+                capture = capt_cls()
+                capture.start()
+
+                self.active_captures.append(capture)
+
+    def _stop_capturing_and_tracing(self):
+        for capture in self.active_captures:
+            self._logger.info(f"Stopped capture {capture.__class__}.")
+            capture.stop()
+
+            print(capture.results())
