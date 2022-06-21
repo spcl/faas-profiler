@@ -8,7 +8,7 @@ import py_faas_profiler as fp
 
 import boto3
 from random import randint
-from os.path import join, abspath, dirname
+from os.path import join, abspath, dirname, basename
 
 config_file = join(abspath(dirname(__file__)), "fp_config.yml")
 
@@ -19,6 +19,10 @@ def handler(event, context):
 
     s3 = boto3.client('s3')
     s3.download_file('faas-profiler-resources', 'coffee.jpg', file_name)
+    s3.upload_file(
+        file_name,
+        'faas-profiler-resources',
+        f"reloop/{basename(file_name)}")
 
     return {
         "message": "hello_world"

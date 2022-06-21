@@ -12,3 +12,6 @@ measurements:
       include_children: false
   - name: Information::Environment
   - name: Information::OperatingSystem
+
+captures:
+  - name: AWS::S3Capture
