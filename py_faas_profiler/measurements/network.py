@@ -12,12 +12,12 @@ import psutil
 from typing import List, Set, Type
 from functools import reduce
 
-from py_faas_profiler.measurements.base import ParallelMeasurement, register_with_name
+from py_faas_profiler.measurements.base import PeriodicMeasurement, register_with_name
 from py_faas_profiler.config import ProfileContext
 
 
 @register_with_name("Network::Connections")
-class Connections(ParallelMeasurement):
+class Connections(PeriodicMeasurement):
 
     _logger = logging.getLogger("Network::Connections")
     _logger.setLevel(logging.INFO)
@@ -73,7 +73,7 @@ class Connections(ParallelMeasurement):
 
 
 @register_with_name("Network::IOCounters")
-class IOCounters(ParallelMeasurement):
+class IOCounters(PeriodicMeasurement):
     def setUp(
         self,
         profiler_context: Type[ProfileContext],

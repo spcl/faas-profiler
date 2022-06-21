@@ -8,12 +8,12 @@ Module for common measurements:
 from time import time
 from typing import Type
 
-from py_faas_profiler.measurements.base import ParallelMeasurement, register_with_name
+from py_faas_profiler.measurements.base import PeriodicMeasurement, register_with_name
 from py_faas_profiler.config import ProfileContext
 
 
 @register_with_name("Common::WallTime")
-class WallTime(ParallelMeasurement):
+class WallTime(PeriodicMeasurement):
     """
     Measures the execution time of the function using the Python standard time library.
 

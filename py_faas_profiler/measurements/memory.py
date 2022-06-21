@@ -13,12 +13,12 @@ from typing import List, Type
 from time import time
 from dataclasses import asdict
 
-from py_faas_profiler.measurements.base import ParallelMeasurement, register_with_name
+from py_faas_profiler.measurements.base import PeriodicMeasurement, register_with_name
 from py_faas_profiler.config import ProfileContext, MeasuringPoint, average_measuring_points
 
 
 @register_with_name("Memory::Usage")
-class Usage(ParallelMeasurement):
+class Usage(PeriodicMeasurement):
 
     _logger = logging.getLogger("Memory::Usage")
     _logger.setLevel(logging.INFO)
