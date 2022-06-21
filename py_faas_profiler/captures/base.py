@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from utilis import Registerable
+from py_faas_profiler.utilis import Registerable
 
 
 class Capture(Registerable):
