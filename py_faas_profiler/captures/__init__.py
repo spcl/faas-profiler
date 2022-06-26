@@ -4,5 +4,4 @@
 Package for invocation capturing.
 """
 
-from .common import *
 from .aws import *
