@@ -10,6 +10,7 @@ import traceback
 from typing import List, Type, Callable, Any
 from multiprocessing import Pipe, connection
 from functools import wraps
+from time import time
 
 from py_faas_profiler.captures.base import Capture
 from py_faas_profiler.measurements import MeasurementProcess, MeasurementGroup
@@ -47,6 +48,8 @@ class Profiler:
     _logger.setLevel(logging.INFO)
 
     def __init__(self, config_file: str = None) -> None:
+        self.profiler_setup_start = time()
+
         self._logger.info(f"Load configuration: {config_file}")
         self.config = Config.load_from_file(config_file)
 
@@ -85,6 +88,7 @@ class Profiler:
         Profiles the given method and exports the results.
         """
         self.profile_context.handle_function_args(event, context)
+        self.profile_context.set_function_name(func)
 
         self.start()
         self._logger.info(f"-- EXECUTING FUNCTION: {func.__name__} --")
@@ -107,6 +111,8 @@ class Profiler:
         Starts the profiling.
         """
         self._logger.info("Profiler run started.")
+        self.profile_context.set_base_information()
+
         self._start_capturing_and_tracing()
         self._start_default_measurements()
         self._start_periodic_measurements()
@@ -144,10 +150,13 @@ class Profiler:
                 self._logger.error(
                     f"No exporter found with name {config_item.name}")
                 continue
-
-            exporter(
-                self.profile_context,
-                config_item.parameters).dump(results_collector)
+            
+            try:
+                exporter(
+                    self.profile_context,
+                    config_item.parameters).dump(results_collector)
+            except Exception as err:
+                self._logger.error(f"Exporting results with {config_item.name} failed: {err}")
 
     # Private methods
 

@@ -55,6 +55,9 @@ class ResultsCollector:
         return {
             "profile_run_id": str(self.profile_context.profile_run_id),
             "py_faas_version": get_faas_profiler_version(),
+            "function_name": self.profile_context.function_name,
+            "function_module": self.profile_context.function_module,
+            "created_at": str(self.profile_context.created_at.isoformat()),
             "measurements": self._collect_measurements_results(),
             "captures": self._collect_capture_results()
         }
@@ -62,7 +65,7 @@ class ResultsCollector:
     def format(self, formatter=json_formatter) -> Any:
         return formatter(self.raw_data)
 
-    def _collect_capture_results(self):
+    def _collect_capture_results(self) -> list:
         return [{
             "name": c.name,
             "invocations": c.invocations()
@@ -70,9 +73,9 @@ class ResultsCollector:
 
     def _collect_measurements_results(self) -> list:
         if not self.config.measurements:
-            return {}
+            return []
 
-        results = {}
+        results = []
         for meas_item in self.config.measurements:
             meas_key = registerable_key(meas_item.name)
             results_file = path.join(
@@ -80,11 +83,10 @@ class ResultsCollector:
                 f"{meas_key}.json")
 
             if path.exists(results_file):
-                if meas_key not in results:
-                    results[meas_key] = self._parse_result_file(results_file)
-                else:
-                    self._logger.warn(
-                        f"Measurement name collision. {meas_key} already exists as measurement name.")
+                results.append({
+                    "name": meas_item.name,
+                    "results": self._parse_result_file(results_file)
+                })
             else:
                 self._logger.warn(
                     f"No result file found for: {meas_item.name}. Skipping")

@@ -41,7 +41,7 @@ class S3Capture(Capture):
             "operation": aws_api_call.operation,
             "bucket": aws_api_call.api_params.get("Bucket"),
             "key": aws_api_call.api_params.get("Key"),
-            "api_params": aws_api_call.api_params,
+            "api_params": {str(k): str(v) for k,v in aws_api_call.api_params.items()},
             "request_url": aws_api_call.endpoint_url,
             "request_uri": aws_api_call.http_uri,
             "request_method": aws_api_call.http_method,

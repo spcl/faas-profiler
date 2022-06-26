@@ -8,6 +8,8 @@ from __future__ import annotations
 import logging
 import pkg_resources
 import yaml
+import inspect
+from datetime import datetime
 
 from os import getpid, mkdir, environ
 from os.path import dirname, join, abspath, exists
@@ -114,6 +116,9 @@ class ProfileContext:
     TODO:
     """
 
+    _logger = logging.getLogger("ProfileContext")
+    _logger.setLevel(logging.INFO)
+
     def __init__(self) -> None:
         self._profile_run_id = uuid4()
         self._pid: int = getpid()
@@ -124,7 +129,24 @@ class ProfileContext:
         self._payload_context = None
         self._payload_event = None
 
+        self._created_at = None
+
+        self._function_name = None
+        self._function_module = None
+
         mkdir(self._tmp_dir)
+
+    def set_function_name(self, func):
+        self._function_name = func.__name__
+        try:
+            module = inspect.getmodule(func)
+            self._function_module = module.__name__
+        except Exception as err:
+            self._logger.error(f"Could not get module by function: {err}")
+            self._function_module = None
+
+    def set_base_information(self):
+        self._created_at = datetime.now()
 
     def set_measurement_process_pid(self, pid: int) -> None:
         self._measurement_process_pid = pid
@@ -152,6 +174,18 @@ class ProfileContext:
     @property
     def payload_event(self):
         return self._payload_event
+
+    @property
+    def function_name(self):
+        return self._function_name
+
+    @property
+    def function_module(self):
+        return self._function_module
+
+    @property
+    def created_at(self):
+        return self._created_at
 
     @property
     def tmp_results_dir(self):

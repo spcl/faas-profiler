@@ -33,6 +33,7 @@ class Usage(PeriodicMeasurement):
         self._own_process_id = profiler_context.measurement_process_pid
         self._measuring_points: List[MeasuringPoint] = []
         self._average_usage = 0
+        self._baseline = 0
 
         try:
             self.process = psutil.Process(profiler_context.pid)
@@ -40,7 +41,11 @@ class Usage(PeriodicMeasurement):
             self._logger.warn(f"Could not set process: {err}")
 
     def start(self) -> None:
-        self._append_new_memory_measurement()
+        self._baseline = self._get_memory()
+
+        self._measuring_points.append(MeasuringPoint(
+            timestamp=time(),
+            data=self._baseline))
 
     def measure(self):
         self._append_new_memory_measurement()
@@ -57,10 +62,10 @@ class Usage(PeriodicMeasurement):
 
     def _append_new_memory_measurement(self):
         current_memory = self._get_memory()
-        if current_memory:
+        if current_memory is not None:
             self._measuring_points.append(MeasuringPoint(
                 timestamp=time(),
-                data=current_memory))
+                data=current_memory - self._measuring_points[-1].data))
 
     def _get_memory(self):
         try:
@@ -75,7 +80,7 @@ class Usage(PeriodicMeasurement):
                             memory += child_memory_info.rss
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     pass
-
+            
             return memory
         except psutil.AccessDenied as e:
             self._logger.error(
