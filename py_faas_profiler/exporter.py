@@ -8,6 +8,7 @@ import json
 import yaml
 import logging
 import boto3
+import requests
 
 from os import path
 from functools import cached_property
@@ -54,7 +55,7 @@ class ResultsCollector:
         return {
             "profile_run_id": str(self.profile_context.profile_run_id),
             "py_faas_version": get_faas_profiler_version(),
-            "measurements": self._collect_results(self.config.measurements),
+            "measurements": self._collect_measurements_results(),
             "captures": self._collect_capture_results()
         }
 
@@ -67,27 +68,28 @@ class ResultsCollector:
             "invocations": c.invocations()
         } for c in self.captures]
 
-    def _collect_results(
-            self, config_item_list: List[Type[Config.ConfigItem]]) -> list:
-        if not config_item_list:
-            return []
+    def _collect_measurements_results(self) -> list:
+        if not self.config.measurements:
+            return {}
 
-        results_list = []
-        for config_item in config_item_list:
+        results = {}
+        for meas_item in self.config.measurements:
+            meas_key = registerable_key(meas_item.name)
             results_file = path.join(
                 self.profile_context.tmp_results_dir,
-                f"{registerable_key(config_item.name)}.json")
+                f"{meas_key}.json")
 
             if path.exists(results_file):
-                results_list.append({
-                    "name": config_item.name,
-                    "results": self._parse_result_file(results_file)
-                })
+                if meas_key not in results:
+                    results[meas_key] = self._parse_result_file(results_file)
+                else:
+                    self._logger.warn(
+                        f"Measurement name collision. {meas_key} already exists as measurement name.")
             else:
                 self._logger.warn(
-                    f"No result file found for: {config_item.name}. Skipping")
+                    f"No result file found for: {meas_item.name}. Skipping")
 
-        return results_list
+        return results
 
     def _parse_result_file(self, file: str) -> dict:
         try:
@@ -158,3 +160,33 @@ class S3Uploader(Exporter):
             key_name = f"{self.folder}/{key_name}"
 
         return key_name
+
+
+@Exporter.register("Console")
+class Console(Exporter):
+    def dump(self, results_collector: Type[ResultsCollector]) -> None:
+        print(results_collector.raw_data)
+
+
+@Exporter.register("DashboardUploader")
+class DashboardUploader(Exporter):
+
+    def __init__(
+            self,
+            profile_context: Type[ProfileContext],
+            config: dict = {}) -> None:
+        self.endpoint_url = config.get("endpoint_url")
+
+        if not self.endpoint_url:
+            raise ValueError(
+                "Cannot initialise DashboardUpload without endpoint url")
+
+        self.s3_client = boto3.client('s3')
+        super().__init__(profile_context, config)
+
+    def dump(self, results_collector: Type[ResultsCollector]) -> None:
+        upload_request = requests.post(
+            self.endpoint_url, json=results_collector.raw_data)
+        upload_request.raise_for_status()
+
+        return upload_request.status_code == 200
