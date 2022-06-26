@@ -6,6 +6,16 @@ from typing import Dict
 from inflection import underscore
 
 
+def get_arg_by_key_or_pos(args, kwargs, pos, kw):
+    try:
+        return kwargs[kw]
+    except KeyError:
+        try:
+            return args[pos]
+        except IndexError:
+            return None
+
+
 def registerable_name_parts(name, delimiter: str = "::") -> tuple:
     return tuple(underscore(part) for part in name.split(delimiter))
 
