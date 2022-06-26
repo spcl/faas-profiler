@@ -9,7 +9,7 @@ import logging
 import pkg_resources
 import yaml
 
-from os import getpid, mkdir
+from os import getpid, mkdir, environ
 from os.path import dirname, join, abspath, exists
 from uuid import uuid4
 from json import load
@@ -19,6 +19,7 @@ from typing import Any, List, Type
 from functools import reduce, cached_property
 from collections import namedtuple
 
+from py_faas_profiler.payload import parse_function_payload
 
 ROOT_DIR = abspath(dirname(__file__))
 SHARED_DIR = join(dirname(ROOT_DIR), "shared")
@@ -53,9 +54,9 @@ class Config:
                 with open(config_file, "r") as fp:
                     try:
                         config = yaml.safe_load(fp)
-                        if isinstance(config, dict):
+                        if config is None or isinstance(config, dict):
                             return Config(
-                                config=config,
+                                config=config if config else {},
                                 config_file=config_file)
 
                         raise ValueError(
@@ -120,10 +121,17 @@ class ProfileContext:
         self._tmp_dir = join(TMP_RESULT_DIR,
                              f"faas_profiler_{self.profile_run_id}_results")
 
+        self._payload_context = None
+        self._payload_event = None
+
         mkdir(self._tmp_dir)
 
     def set_measurement_process_pid(self, pid: int) -> None:
         self._measurement_process_pid = pid
+
+    @cached_property
+    def environment_variables(self):
+        return dict(environ)
 
     @property
     def pid(self) -> int:
@@ -138,8 +146,20 @@ class ProfileContext:
         return self._profile_run_id
 
     @property
+    def payload_context(self):
+        return self._payload_context
+
+    @property
+    def payload_event(self):
+        return self._payload_event
+
+    @property
     def tmp_results_dir(self):
         return self._tmp_dir
+
+    def handle_function_args(self, event, context):
+        self._payload_event, self._payload_context = parse_function_payload(
+            event, context)
 
 
 @dataclass
