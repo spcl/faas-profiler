@@ -31,10 +31,10 @@ def profile(config_file: str = None):
 
     def function_profiler(func):
         @wraps(func)
-        def profiler_wrapper(*args, **kwargs):
+        def profiler_wrapper(event, context, **kwargs):
             profiler = Profiler(config_file=config_file)
 
-            function_return = profiler(func, *args, **kwargs)
+            function_return = profiler(func, event, context, **kwargs)
 
             return function_return
         return profiler_wrapper
@@ -79,16 +79,17 @@ class Profiler:
             f"- Exporters: {self.config.exporters}"
         ))
 
-    def __call__(self, func: Type[Callable], *args, **kwargs) -> Any:
+    def __call__(self, func: Type[Callable], event, context, **kwargs) -> Any:
         """
         Convenience wrapper to profile the given method.
         Profiles the given method and exports the results.
         """
+        self.profile_context.handle_function_args(event, context)
 
         self.start()
         self._logger.info(f"-- EXECUTING FUNCTION: {func.__name__} --")
         try:
-            func_ret = func(*args, **kwargs)
+            func_ret = func(event, context, **kwargs)
         except Exception as ex:
             self._logger.error(f"Function not successfully executed: {ex}")
 
