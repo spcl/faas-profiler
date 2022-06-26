@@ -18,7 +18,7 @@ setuptools.setup(
     install_requires=requirements,
     entry_points={
         'console_scripts': [
-            'fp = faas_profiler.__main__:main',
+            'fp = faas_profiler.__main__:cli'
         ],
     },
 )
