@@ -9,6 +9,7 @@ from typing import Type
 from py_faas_profiler.patchers import patch_module
 from py_faas_profiler.patchers.base import PatchEvent
 from py_faas_profiler.patchers.botocore import AWSApiCall, AWSApiResponse
+from py_faas_profiler.patchers.io import IOCall, IOReturn
 
 from py_faas_profiler.captures.base import Capture, register_with_name
 
@@ -59,4 +60,51 @@ class S3Capture(Capture):
 
 @register_with_name("AWS::EFSCapture")
 class EFSCapture(Capture):
-    pass
+
+    def __init__(self, config: dict = {}) -> None:
+        self.mounting_points = config.get("mount_points")
+
+        if not self.mounting_points:
+            raise ValueError(
+                "Cannot initialise EFSCapture without mounting points")
+
+        self.patcher = patch_module("io")
+        self._efs_captures = []
+
+    def start(self):
+        self.patcher.start()
+        self.patcher.add_capture_observer(self)
+
+    def __call__(
+        self,
+        patch_event: Type[PatchEvent],
+        io_call: Type[IOCall],
+        io_return: Type[IOReturn]
+    ) -> None:
+        for monting_point in self.mounting_points:
+            if io_call.file.startswith(monting_point):
+                self._efs_captures.append({
+                    "efs_mount": monting_point,
+                    "file": io_call.file,
+                    "mode": self._determine_mode(io_call.mode),
+                    "encoding": io_return.encoding,
+                    "io_type": str(io_return.wrapper_type),
+                    "execution_time": patch_event.execution_time
+                })
+
+    def stop(self) -> None:
+        self.patcher.remove_capture_observer(self)
+        self.patcher.stop()
+
+    def invocations(self) -> list:
+        return self._efs_captures
+
+    def _determine_mode(self, mode: str) -> str:
+        if "r+" in mode or "w+" in mode or "a" in mode:
+            return "read/write"
+
+        if "r" in mode:
+            return "read"
+
+        if "w" in mode or "a" in mode:
+            return "write"
