@@ -12,10 +12,13 @@ import os
 import pkg_resources
 import logging
 import psutil
+import re
 
+from typing import Type
 from datetime import datetime
 
 from py_faas_profiler.measurements.base import Measurement, register_with_name
+from py_faas_profiler.config import ProfileContext
 
 
 @register_with_name("Information::Environment")
@@ -64,3 +67,34 @@ class OperatingSystem(Measurement):
     def _get_boot_time(self) -> str:
         bt = datetime.fromtimestamp(psutil.boot_time())
         return f"{bt.year}/{bt.month}/{bt.day} {bt.hour}:{bt.minute}:{bt.second}"
+
+
+@register_with_name("Information::Payload")
+class Payload(Measurement):
+
+    def setUp(
+        self,
+        profiler_context: Type[ProfileContext],
+        config: dict = {}
+    ) -> None:
+        self.profiler_context = profiler_context
+
+    def results(self) -> dict:
+        payload_event = self.profiler_context.payload_event
+        payload_context = self.profiler_context.payload_context
+        environment_variables = self.profiler_context.environment_variables
+        return {
+            "event": {
+                "type": payload_event.event_type,
+                "size": payload_event.size,
+                "content": payload_event.event
+            },
+            "context": {
+                "size": payload_context.size,
+                "content": payload_context.context
+            },
+            "environment": {
+                "size": sys.getsizeof(environment_variables),
+                "content": environment_variables
+            }
+        }
