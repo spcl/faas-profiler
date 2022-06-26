@@ -97,7 +97,7 @@ class Measurement(Registerable):
         except IOError as err:
             raise MeasurementError(
                 f"I/O error during exporting {self.name}: {err}")
-        except BaseException:
+        except BaseException as err:
             raise MeasurementError(
                 f"Unexpected error during exporting {self.name}: {err}")
 
