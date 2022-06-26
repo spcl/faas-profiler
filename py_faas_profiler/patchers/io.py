@@ -57,7 +57,7 @@ class Patcher(base.BasePatcher):
         mode = get_arg_by_key_or_pos(args, kwargs, 1, "mode")
         encoding = get_arg_by_key_or_pos(args, kwargs, 3, "encoding")
 
-        return IOCall(file, mode, encoding)
+        return IOCall(str(file), str(mode), str(encoding))
 
     def extract_return_information(self, function_return):
         if not hasattr(function_return, "__class__"):
@@ -69,6 +69,6 @@ class Patcher(base.BasePatcher):
 
         return IOReturn(
             wrapper_type=io_class,
-            file=getattr(function_return, "name", None),
-            mode=getattr(function_return, "mode", None),
-            encoding=getattr(function_return, "encoding", None))
+            file=str(getattr(function_return, "name", None)),
+            mode=str(getattr(function_return, "mode", None)),
+            encoding=str(getattr(function_return, "encoding", None)))

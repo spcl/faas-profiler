@@ -52,7 +52,7 @@ class BasePatcher:
         self._patched_functions: List[BasePatcher.PatchedFunction] = []
         self._capture_oberservers = set()
 
-        self.target_module = self._import_target_module()
+        # self.target_module = self._import_target_module()
 
     def add_capture_observer(self, observer):
         if not callable(observer):
@@ -75,6 +75,8 @@ class BasePatcher:
         a, *b = function_name.split(".")
         _function_name = b[0] if b else a
         _class_name = a if b else None
+
+        # breakpoint()
 
         self._patched_functions.append(BasePatcher.PatchedFunction(
             module_name=module_name,
@@ -123,6 +125,7 @@ class BasePatcher:
                     patched_function.function_name,
                     func_wrapper.__wrapped__)
             else:
+                # breakpoint()
                 func_wrapper = getattr(module, patched_function.function_name)
                 setattr(
                     module,

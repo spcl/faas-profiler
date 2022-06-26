@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Callable, Type
 
 import py_faas_profiler.patchers.base as base
+from py_faas_profiler.utilis import get_arg_by_key_or_pos
 
 from botocore.client import BaseClient
 
@@ -61,9 +62,9 @@ class Patcher(base.BasePatcher):
 
         meta = getattr(instance, "meta", None)
 
-        operation = get_argument_value(
+        operation = get_arg_by_key_or_pos(
             args, kwargs, 0, "operation_name") if args else None
-        api_params = get_argument_value(
+        api_params = get_arg_by_key_or_pos(
             args, kwargs, 1, "api_params") if args else None
 
         http_method, http_uri = self._get_http_info(meta, operation)
@@ -111,13 +112,3 @@ class Patcher(base.BasePatcher):
             return
 
         return getattr(instance._endpoint, "_endpoint_prefix", None)
-
-
-def get_argument_value(args, kwargs, pos, kw):
-    try:
-        return kwargs[kw]
-    except KeyError:
-        try:
-            return args[pos]
-        except IndexError:
-            return None
