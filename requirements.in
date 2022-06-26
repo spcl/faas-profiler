@@ -6,3 +6,6 @@ pyyaml
 
 # Advanced CLI creation and support
 fire
+
+# AWS interface
+boto3
