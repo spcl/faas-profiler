@@ -19,15 +19,16 @@ provider:
         buildArgs:
           BASE_IMAGE: fp_aws_build_image_node-16.14.2:latest
           FUNCTION_DIR: /function
+  iamRoleStatements:
+    - Effect: "Allow"        
+      Action: s3:PutObject        
+      Resource: arn:aws:s3:::faas-profiler-results/*
 functions:
   hello_world_py:
     iamRoleStatements:
       - Effect: "Allow"        
         Action: s3:GetObject        
         Resource: arn:aws:s3:::faas-profiler-resources/*
-      - Effect: "Allow"        
-        Action: s3:PutObject        
-        Resource: arn:aws:s3:::faas-profiler-results/*
     image:
       command: function.handler
       entryPoint:

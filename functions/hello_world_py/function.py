@@ -17,6 +17,10 @@ config_file = join(abspath(dirname(__file__)), "fp_config.yml")
 def handler(event, context):
     file_name = f'/tmp/coffee_{randint(0, 100)}.jpg'
 
+    a = [1] * (10 ** 6)
+    b = [2] * (2 * 10 ** 7)
+    del b
+
     s3 = boto3.client('s3')
     s3.download_file('faas-profiler-resources', 'coffee.jpg', file_name)
     s3.upload_file(
@@ -24,8 +28,12 @@ def handler(event, context):
         'faas-profiler-resources',
         f"reloop/{basename(file_name)}")
 
+    f = open(file_name, 'r')
+    print(f.name)
+    f.close()
+
     return {
-        "message": "hello_world"
+        "message": "foo"
     }
 
 

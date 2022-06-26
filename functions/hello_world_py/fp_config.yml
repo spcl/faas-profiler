@@ -12,6 +12,21 @@ measurements:
       include_children: false
   - name: Information::Environment
   - name: Information::OperatingSystem
+  - name: Information::Payload
 
 captures:
   - name: AWS::S3Capture
+  - name: AWS::EFSCapture
+    parameters:
+      mount_points: ['/tmp']
+
+
+exporters:
+  - name: Console
+  - name: DashboardUploader
+    parameters:
+      endpoint_url: https://faas-profiler.herokuapp.com/api/new
+  - name: S3Uploader
+    parameters:
+      bucket: faas-profiler-results
+      folder: results
