@@ -7,37 +7,13 @@ from __future__ import annotations
 
 import logging
 from typing import Type
-import yaml
 from abc import ABC, abstractmethod
-from contextlib import contextmanager
-from os.path import dirname, join, exists, basename
+from os.path import join, exists, basename
 from os import makedirs
 from shutil import copyfile
 
 from faas_profiler.images import ImageManager
-
-PROJECT_ROOT = dirname(dirname(__file__))
-TEMPLATES_ABS = join(PROJECT_ROOT, "templates")
-FUNCTIONS_ABS = join(PROJECT_ROOT, "functions")
-FUNCTIONS_REL = "functions"
-
-
-@contextmanager
-def update_serverless_config():
-    serverless_file = join(PROJECT_ROOT, "serverless.yml")
-
-    with open(serverless_file, "r+") as fh:
-        current_config = yaml.safe_load(fh)
-
-        yield(current_config)
-
-        fh.seek(0)
-        yaml.dump(
-            current_config,
-            fh,
-            sort_keys=False,
-            default_flow_style=False)
-        fh.truncate()
+from faas_profiler.config import update_serverless_config, FUNCTIONS_ABS, FUNCTIONS_REL, TEMPLATES_ABS
 
 
 class FunctionGenerator(ABC):
