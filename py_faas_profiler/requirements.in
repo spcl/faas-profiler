@@ -12,5 +12,8 @@ inflection
 ## Packge for monkey patching support
 wrapt
 
+## Execute requests
+requests
+
 # --- Measurements packages --
 psutil
