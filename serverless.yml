@@ -21,6 +21,13 @@ provider:
           FUNCTION_DIR: /function
 functions:
   hello_world_py:
+    iamRoleStatements:
+      - Effect: "Allow"        
+        Action: s3:GetObject        
+        Resource: arn:aws:s3:::faas-profiler-resources/*
+      - Effect: "Allow"        
+        Action: s3:PutObject        
+        Resource: arn:aws:s3:::faas-profiler-results/*
     image:
       command: function.handler
       entryPoint:
@@ -35,3 +42,5 @@ functions:
       - /usr/local/bin/npx
       - aws-lambda-ric
       name: hello_world_js_image
+plugins:
+  - serverless-iam-roles-per-function
