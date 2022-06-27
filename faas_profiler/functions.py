@@ -80,6 +80,12 @@ class FunctionGenerator(ABC):
             self._logger.error(
                 f"A function called '{self.name}' already exists. Abort.")
 
+        fp_config_file = join(self.func_abs_dir, "fp_config.yml")
+        self._logger.info(f"CREATE: {fp_config_file}")
+        copyfile(
+            src=join(TEMPLATES_ABS, "fp_config.yml"),
+            dst=fp_config_file)
+
         function_entry_file = self.copy_function_files()
         dockerfile_path = self.copy_dockerfile()
 

@@ -11,7 +11,7 @@ import logging
 from subprocess import Popen, PIPE
 from shlex import split
 from time import sleep
-from os.path import dirname, join
+from os.path import join
 
 from faas_profiler.functions import FunctionGenerator
 from faas_profiler.images import ImageManager
