@@ -1,0 +1,3 @@
+[submodule "faas-profiler-python"]
+	path = faas-profiler-python
+	url = git@github.com:spcl/faas-profiler-python.git
