@@ -1,5 +1,7 @@
 # FaaS-Profiler
 
+# NOT UP TO DATE
+
 **Prerequisites**
 - Docker
 - Node and Serverless framework [Install instructions](https://www.serverless.com/framework/docs/getting-started)
