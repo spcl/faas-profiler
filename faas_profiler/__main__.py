@@ -1,21 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-FaaS-Profiler Entrypoints
+FaaS-Profiler Main
 """
 
-import sys
-import logging
-
 from fire import Fire
+from faas_profiler import Commands
 
-from faas_profiler import CLI
-
-def cli():
-    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-    logging.info("Starting FaaS-Profiler CLI.")
-    Fire(CLI)
-
+def main():
+    Fire(Commands())
 
 if __name__ == "__main__":
-    cli()
+    main()
