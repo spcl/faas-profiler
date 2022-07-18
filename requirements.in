@@ -6,6 +6,7 @@ pyyaml
 
 # Advanced CLI creation and support
 fire
+inquirer
 
 # AWS interface
 boto3
