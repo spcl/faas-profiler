@@ -57,9 +57,18 @@ if args.dev:
     run_command(
         f"source {args.venv}/bin/activate && pip3 install -r requirements-dev.txt --upgrade")
 
-
-print("Download FaaS-Profiler clients")
-run_command("git submodule update --init --recursive")
-
 print("Install FaaS-Profiler")
 run_command(f"source {args.venv}/bin/activate && pip3 install -e .")
+
+print("Download FaaS-Profiler clients")
+run_command("git submodule update --init --force --remote")
+
+print("Install FaaS-Profiler client for Python")
+run_command(
+    f"source {args.venv}/bin/activate && pip3 install -e faas-profiler-python")
+
+print("Install FaaS-Profiler client for Node")
+# TODO
+
+print("Install FaaS-Profiler Visualizer")
+# TODO
