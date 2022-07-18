@@ -1,0 +1,5 @@
+service: {{ application_name }}
+frameworkVersion: '3'
+provider:
+  name: aws
+  runtime: python2.7

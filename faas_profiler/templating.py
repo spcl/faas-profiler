@@ -21,10 +21,10 @@ class Template:
 
     @classmethod
     def render(
-            cls,
-            target_dir: str,
-            file_name: str = None,
-            context={}
+        cls,
+        target_dir: str,
+        file_name: str = None,
+        context={}
     ):
         """
         Renders and wirtes a new file based on a template.
@@ -42,7 +42,8 @@ class Template:
         template_loader = jinja2.FileSystemLoader(searchpath=TEMPLATES_DIR)
         template_env = jinja2.Environment(
             loader=template_loader,
-            autoescape=jinja2.select_autoescape(['.py-tpl']))
+            autoescape=jinja2.select_autoescape([
+                '.py-tpl', 'gitigonre.txt-tpl', 'serverless.yml-tpl']))
 
         try:
             template = template_env.get_template(cls.template_file)
@@ -60,3 +61,15 @@ class HandlerTemplate(Template):
     template_file = "handler.py-tpl"
     file_format = ".py"
     file_name = "handler"
+
+
+class GitIgnoreTemplate(Template):
+    template_file = "gitignore.txt-tpl"
+    file_format = ""
+    file_name = ".gitignore"
+
+
+class ServerlessTemplate(Template):
+    template_file = "serverless.yml-tpl"
+    file_format = ".yml"
+    file_name = "serverless"
