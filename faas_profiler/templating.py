@@ -35,9 +35,9 @@ class Template:
 
         file_name = file_name if file_name else cls.file_name
         output_file = join(target_dir, file_name + cls.file_format)
-        # if exists(output_file):
-        #     raise TemplatingError(
-        # f"File {file_name + cls.file_format} already exists in {target_dir}")
+        if exists(output_file):
+            raise TemplatingError(
+                f"File {file_name + cls.file_format} already exists in {target_dir}")
 
         template_loader = jinja2.FileSystemLoader(searchpath=TEMPLATES_DIR)
         template_env = jinja2.Environment(
