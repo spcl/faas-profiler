@@ -13,7 +13,7 @@ from termcolor import cprint, colored
 from inquirer import List, Confirm, prompt
 
 
-def run_command(command, env=None):
+def run_command(command, env=None, cwd=None):
     """
     Runs a given command in a subprocess.
     """
@@ -24,6 +24,7 @@ def run_command(command, env=None):
         stderr=PIPE,
         stdout=PIPE,
         env=env,
+        cwd=cwd,
         text=True)
 
     while process.poll() is None:
