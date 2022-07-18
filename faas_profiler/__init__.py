@@ -40,27 +40,45 @@ class ExamplesManager:
         """
         Generates a new function and application
         """
-        if application and function is None:
-            cli.out(f"Generating new application {application}")
-            app = Application.generate(application)
-            cli.success(f"Application {application} created!")
-        elif application and function:
-            try:
-                app = Application.by_name(application)
-            except ValueError as err:
-                if not cli.confirm(
-                    f"Application {application} does not exists. Do you want to create it?",
-                        default=True):
-                    return
+        app = Application.get_or_generate(application)
+        if cli.confirm("Do you want to deploy the application?"):
+            app.deploy()
 
-                cli.out(f"Generating new application {application}")
-                app = Application.generate(application)
-                cli.success(f"Application {application} created!")
-
-            cli.out(
-                f"Generating function {function} for application {application}")
+        if function:
             app.generate_function(function)
-            cli.success(f"Function {function} created!")
+            if cli.confirm("Do you want to deploy the function?"):
+                app.deploy(function)
+
+    def deploy(self, application: str, function: str = None) -> None:
+        app = Application.find_by(application)
+        if app is None:
+            cli.error(f"No application found with name {application}")
+            return
+
+        app.deploy(function)
+        cli.success("Application deployed")
+
+    def invoke(self, application: str, function: str) -> None:
+        """
+        Invokes the function inside the given application
+        """
+        app = Application.find_by(application)
+        if app is None:
+            cli.error(f"No application found with name {application}")
+            return
+
+        app.invoke(function)
+
+    def remove(self, application: str) -> None:
+        """
+        Removes the given application
+        """
+        app = Application.find_by(application)
+        if app is None:
+            cli.error(f"No application found with name {application}")
+            return
+
+        app.remove()
 
 
 class Application:
@@ -85,17 +103,24 @@ class Application:
         return list(valid_applications)
 
     @classmethod
-    def by_name(cls, application_name: str) -> Type[Application]:
+    def get_or_generate(cls, application_name: str) -> Type[Application]:
+        app = cls.find_by(application_name)
+        if app is None:
+            return cls.generate(application_name)
+
+        return app
+
+    @classmethod
+    def find_by(cls, application_name: str) -> Type[Application]:
         path = join(EXAMPLES_DIR, application_name)
         if path not in Application.find_all_applications():
-            raise ValueError(
-                f"No example application found with name: {application_name}")
+            return
 
         return cls(application_name, path)
 
     @classmethod
     def generate(cls, application_name: str) -> Type[Application]:
-
+        cli.out(f"Generating new application {application_name}")
         path = join(EXAMPLES_DIR, application_name)
         if path in Application.find_all_applications():
             raise ValueError(
@@ -173,6 +198,35 @@ class Application:
         """
         return self.sls_config.get("functions", {})
 
+    def deploy(self, function_name: str) -> None:
+        """
+        Deploys the application with serverless
+        """
+        command = "sls deploy"
+        if function_name and function_name in self.functions:
+            command += f" --function {function_name}"
+
+        cli.out("Deploying application with serverless...")
+        cli.run_command(command, cwd=self.path)
+
+    def invoke(self, function_name: str) -> None:
+        """
+        Invokes the function
+        """
+        cli.out(f"Invoking function {function_name}...")
+        output = cli.run_command(
+            f"sls invoke --function {function_name}",
+            cwd=self.path)
+
+        cli.out(f"Function returned: {output}")
+
+    def remove(self):
+        """
+        Removes the application
+        """
+        cli.out("Removing application with serverless...")
+        cli.run_command("sls remove", cwd=self.path)
+
     def generate_function(
         self,
         function_name: str,
@@ -181,6 +235,8 @@ class Application:
         """
         Generates a new function inside the application
         """
+        cli.out(
+            f"Generating function {function_name} for application {self.name}")
         if function_name in self.functions:
             raise ValueError(
                 f"Function named {function_name} already exists in {self.name}")
