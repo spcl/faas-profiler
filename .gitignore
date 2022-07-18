@@ -143,3 +143,6 @@ package-lock.json
 
 # TODO: REMOVE ME 
 .saves
+
+# virtual environment
+.faas-profiler-venv
