@@ -75,25 +75,56 @@ class Commands:
             else:
                 app.generate_function(function, provider)
 
-    def deploy(self, application: str, function: str = None) -> None:
-        app = Application.find_by(application)
-        if app is None:
-            cli.error(f"No application found with name {application}")
-            return
+    def deploy(
+        self,
+        application: str,
+        provider: Provider,
+        function: str = None
+    ) -> None:
+        """
+        Deploys the application.
 
-        app.deploy(function)
-        cli.success("Application deployed")
+        If function is None, the entire application gets deployed
+        """
+        try:
+            provider = Provider[provider.upper()] if provider else None
+        except KeyError:
+            cli.error(f"No provider found with name: {provider}."
+                      f"Available are: {list(Provider)}")
+        else:
+            app = Application.find_by(application)
+            if app is None:
+                cli.error(f"No application found with name {application}")
+                return
 
-    def invoke(self, application: str, function: str) -> None:
+            app.deploy(provider, function)
+            cli.success("Application deployed")
+
+    def invoke(
+        self,
+        application: str,
+        provider: Provider,
+        function: str,
+        times: int = 1
+    ) -> None:
         """
         Invokes the function inside the given application
         """
-        app = Application.find_by(application)
-        if app is None:
-            cli.error(f"No application found with name {application}")
-            return
+        try:
+            provider = Provider[provider.upper()] if provider else None
+        except KeyError:
+            cli.error(f"No provider found with name: {provider}."
+                      f"Available are: {list(Provider)}")
+        else:
+            app = Application.find_by(application)
+            if app is None:
+                cli.error(f"No application found with name {application}")
+                return
 
-        app.invoke(function)
+            cli.out(f"Invoking {times} times function:")
+            for i in range(0, times):
+                cli.out(f"Invocation {i+1}/{times}")
+                app.invoke(provider, function)
 
     def remove(self, application: str) -> None:
         """
@@ -252,24 +283,38 @@ class Application:
         except ValueError:
             return Runtime.UNKNOWN
 
-    def deploy(self, function_name: str) -> None:
+    def deploy(
+        self,
+        provider: Provider,
+        function_name: str = None
+    ) -> None:
         """
         Deploys the application with serverless
         """
-        command = "sls deploy"
+        sls_path = self.get_sls_config_path(provider)
+        if sls_path is None:
+            cli.error(f"No serverless config defined for {provider}")
+            return
+
+        command = f"sls deploy --config {sls_path}"
         if function_name and function_name in self.functions:
             command += f" --function {function_name}"
 
-        cli.out("Deploying application with serverless...")
+        cli.out(f"Deploying application with serverless...")
         cli.run_command(command, cwd=self.path)
 
-    def invoke(self, function_name: str) -> None:
+    def invoke(self, provider: Provider, function_name: str) -> None:
         """
         Invokes the function
         """
+        sls_path = self.get_sls_config_path(provider)
+        if sls_path is None:
+            cli.error(f"No serverless config defined for {provider}")
+            return
+
         cli.out(f"Invoking function {function_name}...")
         output = cli.run_command(
-            f"sls invoke --function {function_name}",
+            f"sls invoke --config {sls_path} --function {function_name}",
             cwd=self.path)
 
         cli.out(f"Function returned: {output}")
