@@ -1,0 +1,12 @@
+service: {{ application_name }}
+frameworkVersion: '3'
+provider:
+  name: aws
+  runtime: {{ runtime }}
+  region: {{ region }}
+plugins:
+  - serverless-python-requirements
+custom:
+  pythonRequirements:
+    dockerizePip: true
+    dockerSsh: true

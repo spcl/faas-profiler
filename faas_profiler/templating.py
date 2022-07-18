@@ -69,7 +69,25 @@ class GitIgnoreTemplate(Template):
     file_name = ".gitignore"
 
 
-class ServerlessTemplate(Template):
-    template_file = "serverless.yml-tpl"
+class AWSServerlessTemplate(Template):
+    template_file = "serverless_aws.yml-tpl"
     file_format = ".yml"
-    file_name = "serverless"
+    file_name = "sls_aws"
+
+
+class GCPServerlessTemplate(Template):
+    template_file = "serverless_gcp.yml-tpl"
+    file_format = ".yml"
+    file_name = "sls_gcp"
+
+
+class AzureServerlessTemplate(Template):
+    template_file = "serverless_azure.yml-tpl"
+    file_format = ".yml"
+    file_name = "sls_azure"
+
+
+class RequirementsTemplate(Template):
+    template_file = "requirements.txt-tpl"
+    file_format = ".txt"
+    file_name = "requirements"

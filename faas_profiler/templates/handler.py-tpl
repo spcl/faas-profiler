@@ -1,9 +1,13 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import json
+import faas_profiler_python as fp
 
-
+@fp.profile()
 def {{ handler_name }}(event, context):
     body = {
-        "message": "Go Serverless v1.0! Your function executed successfully!",
+        "message": "Welcome FaaS-Profiler",
         "input": event
     }
 
