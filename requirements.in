@@ -9,3 +9,9 @@ fire
 
 # AWS interface
 boto3
+
+# caching properties
+cached_property
+
+# templating
+jinja2
