@@ -10,7 +10,7 @@ from subprocess import Popen, PIPE
 from shlex import split
 from time import sleep
 from termcolor import cprint, colored
-from inquirer import List, Confirm, prompt
+from inquirer import List, Checkbox, Confirm, prompt
 
 
 def run_command(command, env=None, cwd=None):
@@ -101,10 +101,15 @@ def input(message: str, type=str, default=None):
         raise KeyboardInterrupt
 
 
-def choice(message: str, choices: list, default=None):
+def choice(message: str, choices: list, multiple: bool = False, default=None):
     """
     Asks for a choice.
     """
+    if multiple:
+        return prompt(
+            [Checkbox("choice", message=message, choices=choices, default=default)],
+            raise_keyboard_interrupt=True).get("choice", default)
+
     return prompt(
         [List("choice", message=message, choices=choices, default=default)],
         raise_keyboard_interrupt=True).get("choice", default)
@@ -116,62 +121,3 @@ def confirm(message: str, default: bool = False) -> bool:
     """
     return prompt([Confirm('confirm', message=message, default=default)],
                   raise_keyboard_interrupt=True).get('confirm', default)
-
-
-# class CLI:
-#     _logger = logging.getLogger("CLI")
-
-#     _BASE_BUILD_IMAGE_NAME = "fp_{}_build_image_{}-{}"
-#     _DOCKER_FUNCTIONS_DIR = "/function"
-
-#     @classmethod
-#     def _build_image_name(cls, provider, runtime, version):
-#         return cls._BASE_BUILD_IMAGE_NAME.format(provider, runtime, version)
-
-#     def __init__(self) -> None:
-#         self._image_manager = ImageManager(
-#             build_image_file=join(CONFIG_DIR, "build_images.yml"))
-
-#     def init(self, rebuild=False) -> None:
-#         self._logger.info("Building base build images for all runtimes.")
-#         self._image_manager.rebuild_all_images(force_rebuild=rebuild)
-
-#     def profile(self, function_name: str, service: str, invocations: int = 1, redeploy: bool = False):
-#         func_info = self.function_info(function_name)
-#         if not func_info:
-#             self._logger.error(f"No function found with name: {function_name}")
-
-#         if not self.is_deployed(function_name):
-#             self._logger.warn(f"Function {function_name} is not deploy. Deploying now:")
-#             self.deploy_function(function_name)
-#         elif redeploy:
-#              self._logger.info(f"Redeploying function {function_name}")
-#              self.deploy_function(function_name)
-
-#         self._logger.info(f"Invoking function {function_name}")
-#         output = run_command(f"sls invoke --function {function_name}")
-
-#         self._logger.info(f"Function returned: {output}")
-
-
-#     def new_function(self, name, runtime):
-#         """
-#         Generates a new function by calling a FunctionGenerator
-#         """
-#         FunctionGenerator.generate(name, runtime, self._image_manager, [])
-
-#     def function_info(self, function_name: str) -> dict:
-#         sls_config = serverless_config()
-
-#         return sls_config.get("functions", {}).get(function_name)
-
-#     def deploy_function(self, function_name: str):
-#         self._logger.info(f"Deploying function {function_name}")
-#         run_command(f"sls deploy --function {function_name}")
-#         self._logger.info(f"Function {function_name} deployed")
-
-#     def is_deployed(self, function_name: str) -> bool:
-#         deployed_funcs = run_command("sls deploy list functions")
-
-# return function_name in deployed_funcs and
-# self.function_info(function_name) is not None
