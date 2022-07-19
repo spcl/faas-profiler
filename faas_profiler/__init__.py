@@ -21,6 +21,7 @@ from faas_profiler.templating import (
     GCPServerlessTemplate,
     AzureServerlessTemplate,
     RequirementsTemplate,
+    ProfilerConfigTemplate,
     TemplatingError
 )
 
@@ -33,6 +34,26 @@ class Commands:
     """
     Welcome to the local FaaS Profiler SDK to test serverless functions with the profiler.
     """
+
+    def instrument(self, project_path: str = os.getcwd()):
+        """
+        Instruments the serverless function in the given project path.
+        """
+        cli.out(f"Instrumenting serverless function at {project_path}")
+        try:
+            file = ProfilerConfigTemplate.render(project_path)
+        except TemplatingError as err:
+            cli.error(err)
+            return
+        cli.out(f"Created: {file}")
+
+        requirements_file = join(project_path, "requirements.txt")
+        if exists(requirements_file) and cli.confirm(
+                f"Do you want to add the profiler client to {requirements_file}"):
+            with open(requirements_file, "a") as fp:
+                fp.write("\nfaas_profiler_python")
+
+            cli.out(f"Client added to: {requirements_file}")
 
     def new_application(self, application: str, runtime: str):
         """
@@ -174,7 +195,7 @@ class Application:
         application_name: str,
         runtime: Runtime,
         aws_region: str = "eu-central-1",
-        gcp_region: str = "europe-west3-a",
+        gcp_region: str = "europe-west3",
         azure_region: str = ""
     ) -> Type[Application]:
         """
