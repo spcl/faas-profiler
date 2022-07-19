@@ -1,0 +1,61 @@
+{% if enable_measurements -%}
+measurements:
+  {% if active_measurements["Common::WallTime"] -%}
+  - name: Common::WallTime
+  {% endif -%}
+  {% if active_measurements["Network::Connections"] -%}
+  - name: Network::Connections
+  {% endif -%}
+  {% if active_measurements["Network::IOCounters"] -%}
+  - name: Network::IOCounters
+  {% endif -%}
+  {% if active_measurements["Memory::Usage"] -%}
+  - name: Memory::Usage
+  {% endif -%}
+  {% if active_measurements["CPU::Usage"] -%}
+  - name: CPU::Usage
+  {% endif -%}
+  {% if active_measurements["Information::Environment"] -%}
+  - name: Information::Environment
+  {% endif -%}
+  {% if active_measurements["Information::OperatingSystem"] -%}
+  - name: Information::OperatingSystem
+  {% endif -%}
+  {% if active_measurements["Information::Payload"] -%}
+  - name: Information::Payload
+  {% endif -%}
+{% endif %}
+
+{% if enable_captures -%}
+captures:
+  {% if active_captures["AWS::S3Capture"] -%}
+  - name: AWS::S3Capture
+  {% endif -%}
+  {% if active_captures["AWS::EFSCapture"] -%}
+  - name: AWS::EFSCapture
+  {% endif -%}
+{% endif %}
+
+tracing:
+  enabled: {{ enable_tracing }}
+  trace_outgoing: "*"
+
+exporters:
+  {% if active_exporters["Console"] -%}
+  - name: Console
+  {% endif -%}
+  {% if active_exporters["Visualizer"] -%}
+  - name: Visualizer
+    {% if exporters_params["Visualizer"] -%}
+    parameters:
+      endpoint_url: {{ exporters_params["Visualizer"]["endpoint_url"] }}
+    {% endif %}
+  {% endif -%}
+  {% if active_exporters["S3Uploader"] -%}
+  - name: S3Uploader
+    {% if exporters_params["S3Uploader"] -%}
+    parameters:
+      bucket: {{ exporters_params["S3Uploader"]["bucket"] }}
+      folder: {{ exporters_params["S3Uploader"]["folder"] }}
+    {% endif %}
+  {% endif -%}
