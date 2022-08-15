@@ -9,7 +9,7 @@ import jinja2
 import faas_profiler.cli as cli
 
 from os.path import join, exists
-from faas_profiler.config import TEMPLATES_DIR
+from faas_profiler.config import config
 
 
 class TemplatingError(RuntimeError):
@@ -41,7 +41,7 @@ class Template:
             raise TemplatingError(
                 f"File {file_name + cls.file_format} already exists in {target_dir}")
 
-        template_loader = jinja2.FileSystemLoader(searchpath=TEMPLATES_DIR)
+        template_loader = jinja2.FileSystemLoader(searchpath=config.templates_dir)
         template_env = jinja2.Environment(
             loader=template_loader,
             autoescape=jinja2.select_autoescape([

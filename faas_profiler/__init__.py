@@ -13,7 +13,9 @@ from typing import List, Type
 from os.path import join, exists
 from glob import glob
 
-from faas_profiler.config import EXAMPLES_DIR, Runtime, Provider
+from faas_profiler_core.constants import Runtime, Provider
+
+from faas_profiler.config import config
 from faas_profiler.dashboard import app
 from faas_profiler.templating import (
     HandlerTemplate,
@@ -185,7 +187,7 @@ class Application:
         Returns a list of paths to example application within in the examples folder.
         Includes the path if a serverless config file is present.
         """
-        subfolders = [f.path for f in os.scandir(EXAMPLES_DIR) if f.is_dir()]
+        subfolders = [f.path for f in os.scandir(config.examples_dir) if f.is_dir()]
 
         valid_applications = filter(
             lambda p: any(glob(join(p, Application.ACCEPTED_SLS_CONFIG))),
@@ -195,7 +197,7 @@ class Application:
 
     @classmethod
     def find_by(cls, application_name: str) -> Type[Application]:
-        path = join(EXAMPLES_DIR, application_name)
+        path = join(config.examples_dir, application_name)
         if path not in Application.find_all_applications():
             raise ValueError(
                 f"No application with name {application_name} found.")
@@ -215,7 +217,7 @@ class Application:
         Generates a new example application inside 'examples'
         """
         cli.out(f"Generating new application {application_name}")
-        path = join(EXAMPLES_DIR, application_name)
+        path = join(config.examples_dir, application_name)
         if path in Application.find_all_applications():
             raise ValueError(
                 f"Application with name {application_name} already exists")
