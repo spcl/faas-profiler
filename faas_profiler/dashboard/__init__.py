@@ -12,7 +12,7 @@ app = dash.Dash(
     use_pages=True,
     pages_folder="")
 
-# from .pages import *
+from .pages import *
 
 app.layout = dash.html.Div([
     dbc.NavbarSimple(
