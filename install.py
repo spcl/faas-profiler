@@ -33,10 +33,6 @@ parser.add_argument(
     default=DEFAULT_VENV,
     help='destination of Python virtual environment')
 
-parser.add_argument('--dev', action='store_true')
-parser.add_argument('--no-dev', dest='dev', action='store_false')
-parser.set_defaults(dev=True)
-
 args = parser.parse_args()
 
 if not os.path.exists(args.venv):
@@ -52,23 +48,5 @@ print("Install production requirements")
 run_command(
     f"source {args.venv}/bin/activate && pip3 install -r requirements.txt --upgrade")
 
-if args.dev:
-    print("Install development requirements")
-    run_command(
-        f"source {args.venv}/bin/activate && pip3 install -r requirements-dev.txt --upgrade")
-
 print("Install FaaS-Profiler")
 run_command(f"source {args.venv}/bin/activate && pip3 install -e .")
-
-print("Download FaaS-Profiler clients")
-run_command("git submodule update --init --force --remote")
-
-print("Install FaaS-Profiler client for Python")
-run_command(
-    f"source {args.venv}/bin/activate && pip3 install -e faas-profiler-python")
-
-print("Install FaaS-Profiler client for Node")
-# TODO
-
-print("Install FaaS-Profiler Visualizer")
-# TODO

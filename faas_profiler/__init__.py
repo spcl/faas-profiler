@@ -14,6 +14,7 @@ from os.path import join, exists
 from glob import glob
 
 from faas_profiler.config import EXAMPLES_DIR, Runtime, Provider
+from faas_profiler.dashboard import app
 from faas_profiler.templating import (
     HandlerTemplate,
     GitIgnoreTemplate,
@@ -34,6 +35,18 @@ class Commands:
     """
     Welcome to the local FaaS Profiler SDK to test serverless functions with the profiler.
     """
+
+    def dashboard(self, host="127.0.0.1", port=3000, debug=False) -> None:
+        """
+        Starts dash application to view recent traces.
+        """
+        app.run(host=host, port=port, debug=debug)
+
+    def profile(self) -> None:
+        """
+        Profiles given function.
+        """
+        pass
 
     def instrument(self, project_path: str = os.getcwd()):
         """
