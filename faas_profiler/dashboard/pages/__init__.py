@@ -2,4 +2,4 @@
 # -*- coding: utf-8 -*-
 
 from .index import *
-# from .view_trace import *
+from .view_trace import *
