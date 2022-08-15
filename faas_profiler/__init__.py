@@ -17,6 +17,7 @@ from faas_profiler_core.constants import Runtime, Provider
 
 from faas_profiler.config import config
 from faas_profiler.dashboard import app
+from faas_profiler.postprocessing import TraceBuilder
 from faas_profiler.templating import (
     HandlerTemplate,
     GitIgnoreTemplate,
@@ -49,6 +50,12 @@ class Commands:
         Profiles given function.
         """
         pass
+
+    def process_records(self):
+        """
+        Manually builds traces.
+        """
+        TraceBuilder().execute()
 
     def instrument(self, project_path: str = os.getcwd()):
         """
