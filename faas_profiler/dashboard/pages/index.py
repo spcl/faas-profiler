@@ -9,57 +9,46 @@ import dash_bootstrap_components as dbc
 
 from faas_profiler.config import config
 
-def trace_list():
+
+def index():
     """
-    Renders a trace list for all recorded traces
+    Layout for index page.
+
+    Shows all profiles.
     """
-    if len(config.storage.trace_keys) == 0:
+    if not config.storage.has_profiles:
         return html.Div(
             html.H4(
-                "No recorded Traces found.",
+                "No recorded Profiles found.",
                 className="text-danger",
                 style={
                     "margin-top": "20px",
                     "text-align": "center"}))
 
-    return html.Div(
-        dbc.Accordion(children=[
-            dbc.AccordionItem([
-                dbc.Button(
-                    "View Trace",
-                    href=f"/trace/{trace.trace_id}",
-                    outline=True,
-                    color="primary"),
-            ],
-                # title=f"Trace ID: {trace.trace_id} - Function Name: {trace.root_function_context.function_name}"
-                title=f"Trace ID: {trace.trace_id}"
-            ) for trace in config.storage.traces()],
-            flush=True,
-            start_collapsed=True
-        )
-    )
-
-
-def layout():
-    """
-    Layout for index page.
-
-    Shows all traces.
-    """
+    profile_ids = config.storage.profile_ids
 
     return dbc.Container([
         html.H3(
-            f"Recorded Traces ({config.storage.number_of_traces})",
+            f"All Profiles ({config.storage.number_of_profiles})",
             className="display-8",
             style={"margin-top": "20px"}
         ),
-        html.Hr(className="my-2"),
-        html.P(
-            "Look at traces recorded with the Faas Profiler.",
-            className="lead",
-        ),
-        trace_list()
+        html.Div([
+            dbc.Card([
+                dbc.CardBody(
+                    [
+                        html.H4(f"Profile: {profile_id}", className="card-title"),
+                        html.P(
+                            "Some quick example text to build on the card title and "
+                            "make up the bulk of the card's content.",
+                            className="card-text",
+                        ),
+                        dbc.Button("View Profile", href=f"/{profile_id}", color="primary"),
+                    ]
+                ),
+            ], style={"margin-bottom": "10px"})
+            for profile_id in profile_ids])
     ])
 
 
-dash.register_page(__name__, path='/', layout=layout)
+dash.register_page(__name__, path="/", layout=index)
