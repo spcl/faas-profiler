@@ -3,9 +3,8 @@
 FaaS-Profiler Post processing
 """
 
-import sys
 import logging
-from typing import Dict, Set, Type
+from typing import Dict, List, Set, Type
 from uuid import UUID, uuid4
 from tqdm import tqdm
 
@@ -13,8 +12,6 @@ from faas_profiler_core.models import TracingContext, TraceRecord
 
 from faas_profiler.config import config
 from faas_profiler.models import Trace, Profile
-
-# logging.basicConfig(stream=sys.stdout)
 
 
 def make_identifier_string(identifier: dict) -> str:
@@ -86,7 +83,7 @@ class TraceCache:
 class RecordProcessor:
 
     @classmethod
-    def execute(cls):
+    def execute(cls) -> List[Profile]:
         """
         Strategy for processing new records.
         """
@@ -102,7 +99,7 @@ class RecordProcessor:
 
         self.profiles_by_func_key: Dict[str, Profile] = {}
 
-    def _execute(self) -> None:
+    def _execute(self) -> List[Profile]:
         """
         Builds new traces out of unprocessed records
         """
@@ -124,6 +121,8 @@ class RecordProcessor:
             f"\n Combined {self.trace_cache.number_of_traces} profile. Storing them.")
         for profile in tqdm(self.profiles_by_func_key.values()):
             config.storage.store_profile(profile)
+
+        return list(self.profiles_by_func_key.values())
 
     def _process_record(self, record: Type[TraceRecord]) -> None:
         """
