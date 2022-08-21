@@ -7,6 +7,7 @@ Memory Analyzers
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 
@@ -99,12 +100,22 @@ class MemoryUsageAnalyzer(Analyzer):
         data = pd.DataFrame({
             "Time (ms)": time_interval, "Usage (MB)": measuring_points
         })
+        mean = sum(measuring_points) / n
 
         fig = px.line(
             data,
             x="Time (ms)",
             y="Usage (MB)",
             title="Memory-Usage")
+
+        fig.add_shape(go.layout.Shape(
+            type="line",
+            x0=time_interval[0],
+            y0=mean,
+            x1=time_interval[-1],
+            y1=mean,
+            line=dict(color="Red", width=2)))
+
 
         return html.Div([
             dcc.Graph(figure=fig)
