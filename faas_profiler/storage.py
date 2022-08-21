@@ -16,9 +16,8 @@ from functools import cached_property
 from uuid import UUID
 from os.path import basename, splitext
 
-from faas_profiler_core.models import TraceRecord
-
-from faas_profiler.models import Profile
+from faas_profiler.models import Trace, TraceRecord
+from faas_profiler.profile import Profile
 from faas_profiler.utilis import Loggable
 
 
@@ -35,7 +34,8 @@ class RecordStorage(ABC, Loggable):
     PROFILES_PREFIX = "profiles/"
     PROFILES_FORMAT = PROFILES_PREFIX + "{profile_id}.json"
     UNPROCESSED_RECORDS_PREFIX = "unprocessed_records/"
-    PROCESSED_RECORDS_PREFIX = "processed_records/"
+    PROCESSED_RECORDS_PREFIX = "records/"
+    PROCESSED_TRACES_PREFIX = "traces/"
 
     def __init__(self):
         super().__init__()
@@ -86,6 +86,13 @@ class RecordStorage(ABC, Loggable):
     def get_profile(self, profile_id: str):
         """
         Get a single profile.
+        """
+        pass
+
+    @abstractmethod
+    def store_trace(self, trace: Type[Trace]):
+        """
+        Store a new trace
         """
         pass
 
@@ -241,6 +248,23 @@ class S3RecordStorage(RecordStorage):
             Bucket=self.bucket_name,
             Key=_key_name,
             Body=profile_json)
+
+    def store_trace(self, trace: Type[Trace]):
+        """
+        Stores a new trace.
+        """
+        trace_data = trace.dump()
+        trace_json = json.dumps(
+            trace_data,
+            ensure_ascii=False,
+            indent=None
+        ).encode('utf-8')
+
+        _key_name = f"{self.PROCESSED_TRACES_PREFIX}{trace.trace_id}.json"
+        self.client.put_object(
+            Bucket=self.bucket_name,
+            Key=_key_name,
+            Body=trace_json)
 
     """
     Private methods
