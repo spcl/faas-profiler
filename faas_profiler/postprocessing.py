@@ -8,10 +8,19 @@ from typing import Dict, List, Set, Type
 from uuid import UUID, uuid4
 from tqdm import tqdm
 
-from faas_profiler_core.models import TracingContext, TraceRecord
+from faas_profiler_core.models import (
+    TracingContext,
+    TraceRecord
+)
 
 from faas_profiler.config import config
 from faas_profiler.models import Trace, Profile
+from faas_profiler.core import (
+    add_record_to_trace,
+    add_trace_to_profile,
+    get_trace_root_function,
+    merge_traces
+)
 
 
 def make_identifier_string(identifier: dict) -> str:
@@ -140,13 +149,13 @@ class RecordProcessor:
 
         self.logger.info(
             f"Processing Record ID {trace_ctx.record_id} - Context: {trace_ctx} - Function Context: {func_ctx}")
-        record_trace = self._create_or_return_trace(trace_ctx.trace_id)
-        record_trace.add_record(record)
+        trace = self._create_or_return_trace(trace_ctx.trace_id)
 
-        self.trace_cache.cache_trace(record_trace)
+        add_record_to_trace(trace, record)
+        self.trace_cache.cache_trace(trace)
 
         if trace_ctx.parent_id is None and in_ctx.resolvable:
-            self._resolve_inbound_context(record_trace, record)
+            self._resolve_inbound_context(trace, record)
         else:
             self.logger.info(
                 "Skipping inbound resolving. Parent ID is set or inbound context is not resolvable")
@@ -154,7 +163,7 @@ class RecordProcessor:
         if out_ctxs:
             self.logger.info(
                 f"Resolving {len(out_ctxs)} Outbound contexts.")
-            self._resolve_outbound_context(record_trace, record)
+            self._resolve_outbound_context(trace, record)
         else:
             self.logger.info(
                 "Skipping outbound resolving. No outbound contexts defined.")
@@ -165,13 +174,17 @@ class RecordProcessor:
         """
         Postprocesses a cached trace.
         """
-        root_function = trace.root_function
+        root_function = get_trace_root_function(trace)
         profile = self.profiles_by_func_key.get(root_function.function_key)
         if profile:
-            profile.traces.append(trace)
+            add_trace_to_profile(profile, trace)
         else:
             self.profiles_by_func_key[root_function.function_key] = Profile(
-                profile_id=uuid4(), traces=[trace], function_context=root_function)
+                profile_id=uuid4(),
+                trace_ids=set([trace.trace_id]),
+                function_context=root_function)
+
+        config.storage.store_trace(trace)
 
     """
     Private helper Methods
@@ -215,8 +228,9 @@ class RecordProcessor:
                 self.logger.info(
                     f"Found Parent trace {parent_trace.trace_id} for parent tracing context {parent_context.trace_id}")
 
-                parent_trace.merge_trace(child_trace)
+                merge_traces(parent_trace, child_trace)
                 record.tracing_context.parent_id = parent_context.record_id
+
                 self.trace_cache.cache_trace(
                     parent_trace, override_trace_id=child_trace.trace_id)
                 self.trace_cache.flush_trace(child_trace.trace_id)
@@ -259,10 +273,9 @@ class RecordProcessor:
                     self.logger.info(
                         f"Found Child trace {child_context.trace_id} for child tracing context {child_context.trace_id}")
 
-                    parent_trace.merge_trace(
-                        child_trace,
-                        parent_id=tracing_context.record_id,
-                        root_child_record_id=child_context.record_id)
+                    merge_traces(parent_trace, child_trace,
+                                 parent_id=tracing_context.record_id,
+                                 root_child_record_id=child_context.record_id)
 
                     self.trace_cache.cache_trace(
                         parent_trace, override_trace_id=child_trace.trace_id)
