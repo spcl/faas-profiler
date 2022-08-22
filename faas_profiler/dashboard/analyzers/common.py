@@ -10,13 +10,15 @@ from typing import Tuple, Type
 from dash import html, dcc
 
 from faas_profiler_core.models import TraceRecord
+
 from faas_profiler.dashboard.analyzers import Analyzer
 
 
-class ExecutionTimeAnalyzer:
+class ExecutionTimeAnalyzer(Analyzer):
 
     def __init__(self, record: Type[TraceRecord]) -> None:
         self.record = record
+        super().__init__()
 
     def name(self) -> str:
         return "Execution Time Breakdown"

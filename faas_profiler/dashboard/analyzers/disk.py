@@ -6,10 +6,9 @@ Network Analyzers
 
 import plotly.graph_objects as go
 import dash_bootstrap_components as dbc
-import dash_core_components as dcc
 
 from typing import Type
-from dash import html
+from dash import html, dcc
 
 from faas_profiler_core.models import DiskIOCounters
 from faas_profiler.dashboard.analyzers import Analyzer
@@ -23,7 +22,7 @@ class DiskIOAnalyzer(Analyzer):
         self.record_name = record_data.name
         self.results = DiskIOCounters.load(self.record_data.results)
 
-        super().__init__(record_data)
+        super().__init__()
 
     def name(self) -> str:
         """

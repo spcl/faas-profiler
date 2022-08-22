@@ -4,17 +4,17 @@
 Memory Analyzers
 """
 
+from uuid import UUID
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import dash_bootstrap_components as dbc
-import dash_core_components as dcc
-
 from typing import Type
-from dash import html
+from dash import html, dcc
 
 from faas_profiler_core.models import MemoryLineUsage, MemoryUsage
+from faas_profiler.core import ProfileAccess
 
 from faas_profiler.dashboard.analyzers import Analyzer
 from faas_profiler_core.models import RecordData
@@ -27,7 +27,7 @@ class LineMemoryAnalyzer(Analyzer):
         self.record_name = record_data.name
         self.results = MemoryLineUsage.load(self.record_data.results)
 
-        super().__init__(record_data)
+        super().__init__()
 
     def name(self) -> str:
         """
@@ -64,6 +64,7 @@ class LineMemoryAnalyzer(Analyzer):
         return dbc.Table(
             table_header +
             table_body,
+            borderless=True,
             bordered=False,
             color="light")
 
@@ -75,7 +76,7 @@ class MemoryUsageAnalyzer(Analyzer):
         self.record_name = record_data.name
         self.results = MemoryUsage.load(self.record_data.results)
 
-        super().__init__(record_data)
+        super().__init__()
 
     def name(self) -> str:
         """
@@ -116,6 +117,36 @@ class MemoryUsageAnalyzer(Analyzer):
             y1=mean,
             line=dict(color="Red", width=2)))
 
+        return html.Div([
+            dcc.Graph(figure=fig)
+        ])
+
+
+class ProfileMemoryUsageAnalyzer(Analyzer):
+
+    def __init__(self, profile_access: Type[ProfileAccess]):
+        self.profile_access = profile_access
+        self.all_memory_data = self.profile_access.get_all_record_data(
+            "memory::Usage")
+        super().__init__()
+
+    def name(self) -> str:
+        return "Profile Memory Usage"
+
+    def render(self):
+        fig = go.Figure()
+        for trace, trace_data in self.all_memory_data.items():
+            fig.add_trace(go.Bar(
+                x=list(trace_data.keys()),
+                y=[np.average(f["measuring_points"]) * 1e-6 for f in trace_data.values()],
+                name=str(trace),
+                xaxis=None
+            ))
+
+        fig.update_layout(
+            barmode='group',
+            xaxis_visible=False,
+            xaxis_showticklabels=False)
 
         return html.Div([
             dcc.Graph(figure=fig)

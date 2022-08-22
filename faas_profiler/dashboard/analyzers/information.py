@@ -21,7 +21,7 @@ class EnvironmentAnalyzer(Analyzer):
         self.record_name = record_data.name
         self.results = InformationEnvironment.load(self.record_data.results)
 
-        super().__init__(record_data)
+        super().__init__()
 
     def name(self) -> str:
         """
@@ -59,7 +59,7 @@ class OperatingSystemAnalyzer(Analyzer):
         self.results = InformationOperatingSystem.load(
             self.record_data.results)
 
-        super().__init__(record_data)
+        super().__init__()
 
     def name(self) -> str:
         """
