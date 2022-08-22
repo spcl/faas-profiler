@@ -16,8 +16,7 @@ from functools import cached_property
 from uuid import UUID
 from os.path import basename, splitext
 
-from faas_profiler.models import Trace, TraceRecord
-from faas_profiler.profile import Profile
+from faas_profiler.models import Trace, TraceRecord, Profile
 from faas_profiler.utilis import Loggable
 
 
@@ -36,6 +35,7 @@ class RecordStorage(ABC, Loggable):
     UNPROCESSED_RECORDS_PREFIX = "unprocessed_records/"
     PROCESSED_RECORDS_PREFIX = "records/"
     PROCESSED_TRACES_PREFIX = "traces/"
+    TRACE_FORMAT = PROCESSED_TRACES_PREFIX + "{trace_id}.json"
 
     def __init__(self):
         super().__init__()
@@ -107,6 +107,13 @@ class RecordStorage(ABC, Loggable):
     def store_profile(self, profile: Type[Profile]) -> None:
         """
         Stores a new profile.
+        """
+        pass
+
+    @abstractmethod
+    def get_trace(self, trace_id: UUID) -> Type[Trace]:
+        """
+        Gets a single trace.
         """
         pass
 
@@ -265,6 +272,25 @@ class S3RecordStorage(RecordStorage):
             Bucket=self.bucket_name,
             Key=_key_name,
             Body=trace_json)
+
+    def get_trace(self, trace_id: UUID) -> Type[Trace]:
+        """
+        Gets a single trace.
+        """
+        _key = self.TRACE_FORMAT.format(trace_id=str(trace_id))
+        try:
+            obj = self.client.get_object(Bucket=self.bucket_name, Key=_key)
+        except ClientError as err:
+            raise RecordStorageError(
+                f"Failed to get object {_key}: {err}")
+
+        if "Body" in obj:
+            body = json.loads(obj["Body"].read().decode('utf-8'))
+            try:
+                return Trace.load(body)
+            except ValidationError as err:
+                raise RecordStorageError(
+                    f"Failed to deserialize {body}: {err}")
 
     """
     Private methods

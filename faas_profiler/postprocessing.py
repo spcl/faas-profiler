@@ -222,7 +222,7 @@ class RecordProcessor:
         if identifier in self.outbound_requests:
             self.logger.info(
                 f"Found Outbound request for Inbound identifier {identifier}")
-            parent_context = self.outbound_requests[identifier]
+            parent_context, parent_out_ctx = self.outbound_requests[identifier]
             parent_trace = self.trace_cache.get_trace(parent_context.trace_id)
             if parent_trace:
                 self.logger.info(
@@ -230,6 +230,8 @@ class RecordProcessor:
 
                 merge_traces(parent_trace, child_trace)
                 record.tracing_context.parent_id = parent_context.record_id
+
+                inbound_context.trigger_finished_at = parent_out_ctx.finished_at
 
                 self.trace_cache.cache_trace(
                     parent_trace, override_trace_id=child_trace.trace_id)
@@ -239,13 +241,13 @@ class RecordProcessor:
                     f"Cannot find parent trace for parent trace ID {parent_context.trace_id}")
                 self.logger.info("Store Inbound request for later resolving.")
 
-                self.inbound_requests[identifier] = tracing_context
+                self.inbound_requests[identifier] = (tracing_context, inbound_context)
         else:
             self.logger.info(
                 f"Cannot find Outbound request for Inbound identifier {identifier}")
             self.logger.info("Store Inbound request for later resolving.")
 
-            self.inbound_requests[identifier] = tracing_context
+            self.inbound_requests[identifier] = (tracing_context, inbound_context)
 
     def _resolve_outbound_context(
         self,
@@ -266,12 +268,14 @@ class RecordProcessor:
             if identifier in self.inbound_requests:
                 self.logger.info(
                     f"Found Inbound request for Outbound identifier {identifier}")
-                child_context = self.inbound_requests[identifier]
+                child_context, child_in_ctx = self.inbound_requests[identifier]
                 child_trace = self.trace_cache.get_trace(
                     child_context.trace_id)
                 if child_trace:
                     self.logger.info(
                         f"Found Child trace {child_context.trace_id} for child tracing context {child_context.trace_id}")
+
+                    child_in_ctx.trigger_finished_at = out_ctx.finished_at
 
                     merge_traces(parent_trace, child_trace,
                                  parent_id=tracing_context.record_id,
@@ -286,11 +290,11 @@ class RecordProcessor:
                     self.logger.info(
                         "Store Outbound request for later resolving.")
 
-                    self.outbound_requests[identifier] = tracing_context
+                    self.outbound_requests[identifier] = (tracing_context, out_ctx)
             else:
                 self.logger.info(
                     f"Cannot find Inbound request for Outbound identifier {identifier}")
                 self.logger.info(
                     "Store Outbound request for later resolving.")
 
-                self.outbound_requests[identifier] = tracing_context
+                self.outbound_requests[identifier] = (tracing_context, out_ctx)
