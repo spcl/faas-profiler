@@ -17,7 +17,7 @@ from faas_profiler_core.constants import Runtime, Provider
 
 from faas_profiler.config import config
 from faas_profiler.dashboard import app
-from faas_profiler.postprocessing import TraceBuilder
+from faas_profiler.postprocessing import RecordProcessor
 from faas_profiler.templating import (
     HandlerTemplate,
     GitIgnoreTemplate,
@@ -55,7 +55,7 @@ class Commands:
         """
         Manually builds traces.
         """
-        TraceBuilder().execute()
+        RecordProcessor.execute()
 
     def instrument(self, project_path: str = os.getcwd()):
         """
@@ -194,7 +194,9 @@ class Application:
         Returns a list of paths to example application within in the examples folder.
         Includes the path if a serverless config file is present.
         """
-        subfolders = [f.path for f in os.scandir(config.examples_dir) if f.is_dir()]
+        subfolders = [
+            f.path for f in os.scandir(
+                config.examples_dir) if f.is_dir()]
 
         valid_applications = filter(
             lambda p: any(glob(join(p, Application.ACCEPTED_SLS_CONFIG))),
