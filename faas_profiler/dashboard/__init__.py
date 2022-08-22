@@ -4,15 +4,19 @@
 FaaS-Profiler Dashboard module
 """
 
+from faas_profiler.dashboard.pages import *
 import dash
 import dash_bootstrap_components as dbc
+
+import dash_cytoscape as cyto
+cyto.load_extra_layouts()
 
 app = dash.Dash(
     external_stylesheets=[dbc.themes.FLATLY],
     use_pages=True,
-    pages_folder="")
+    pages_folder="",
+    prevent_initial_callbacks=True)
 
-from .pages import *
 
 app.layout = dash.html.Div([
     dbc.NavbarSimple(
@@ -21,5 +25,4 @@ app.layout = dash.html.Div([
         color="primary",
         dark=True
     ),
-    dash.page_container
-])
+    dash.page_container])
