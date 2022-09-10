@@ -3,11 +3,42 @@
 """
 Dash components for Index
 """
+from typing import Type
 import dash
 from dash import html
 import dash_bootstrap_components as dbc
 
 from faas_profiler.config import config
+from faas_profiler.models import Profile
+
+
+def profile_card(profile: Type[Profile]) -> dbc.Card:
+    _table_items = []
+
+    _title = profile.profile_id
+
+    _function_context = profile.function_context
+    if _function_context:
+        _table_items.extend([
+            dbc.ListGroupItem([html.B("Provider: "), _function_context.provider.value]),
+            dbc.ListGroupItem([html.B("Region: "), _function_context.region]),
+            dbc.ListGroupItem([html.B("Handler: "), _function_context.handler]),
+            dbc.ListGroupItem([html.B("Runtime: "), _function_context.runtime.value]),
+        ])
+        _title = _function_context.function_key
+
+    return dbc.Card([
+        dbc.CardBody(
+            [
+                html.H4([
+                    str(_title),
+                    dbc.Badge(f"Traces: {len(profile.trace_ids)}", className="ms-1")
+                ], className="card-title"),
+                dbc.ListGroup(_table_items, flush=True),
+                dbc.Button("View Profile", href=f"/{profile.profile_id}", color="primary"),
+            ]
+        ),
+    ], style={"margin-bottom": "10px"})
 
 
 def index():
@@ -25,29 +56,18 @@ def index():
                     "margin-top": "20px",
                     "text-align": "center"}))
 
-    profile_ids = config.storage.profile_ids
-
     return dbc.Container([
         html.H3(
-            f"All Profiles ({config.storage.number_of_profiles})",
+            f"AWS Profiles ({config.storage.number_of_profiles})",
             className="display-8",
             style={"margin-top": "20px"}
         ),
-        html.Div([
-            dbc.Card([
-                dbc.CardBody(
-                    [
-                        html.H4(f"Profile: {profile_id}", className="card-title"),
-                        html.P(
-                            "Some quick example text to build on the card title and "
-                            "make up the bulk of the card's content.",
-                            className="card-text",
-                        ),
-                        dbc.Button("View Profile", href=f"/{profile_id}", color="primary"),
-                    ]
-                ),
-            ], style={"margin-bottom": "10px"})
-            for profile_id in profile_ids])
+        html.Div([profile_card(profile) for profile in config.storage.profiles()]),
+        html.H3(
+            f"GCP Profiles",
+            className="display-8",
+            style={"margin-top": "20px"}
+        )
     ])
 
 
