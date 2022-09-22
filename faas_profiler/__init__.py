@@ -17,7 +17,7 @@ from faas_profiler_core.constants import Runtime, Provider
 
 from faas_profiler.config import config
 from faas_profiler.dashboard import app
-from faas_profiler.postprocessing import RecordProcessor
+from faas_profiler.postprocessing_new import process_records
 from faas_profiler.templating import (
     HandlerTemplate,
     GitIgnoreTemplate,
@@ -39,10 +39,26 @@ class Commands:
     Welcome to the local FaaS Profiler SDK to test serverless functions with the profiler.
     """
 
-    def dashboard(self, host="127.0.0.1", port=3000, debug=False) -> None:
+    def dashboard(
+        self,
+        provider: str,
+        region: str,
+        project_id: str = None,
+        records_bucket: str = "faas-profiler-records",
+        host="127.0.0.1",
+        port=3000,
+        debug=False
+    ) -> None:
         """
         Starts dash application to view recent traces.
         """
+        config.provider = provider
+        config.region = region
+        config.storage_bucket = records_bucket
+
+        if config.provider == Provider.GCP:
+            config.project_id = project_id
+
         app.run(host=host, port=port, debug=debug)
 
     def profile(self) -> None:
@@ -51,11 +67,24 @@ class Commands:
         """
         pass
 
-    def process_records(self):
+    def process_records(
+        self,
+        provider: str,
+        region: str,
+        project_id: str = None,
+        records_bucket: str = "faas-profiler-records"
+    ):
         """
         Manually builds traces.
         """
-        RecordProcessor.execute()
+        config.provider = provider
+        config.region = region
+        config.storage_bucket = records_bucket
+
+        if config.provider == Provider.GCP:
+            config.project_id = project_id
+
+        process_records()
 
     def instrument(self, project_path: str = os.getcwd()):
         """
