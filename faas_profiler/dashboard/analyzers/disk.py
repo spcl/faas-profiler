@@ -7,6 +7,7 @@ Network Analyzers
 import plotly.graph_objects as go
 import dash_bootstrap_components as dbc
 
+from plotly.subplots import make_subplots
 from typing import Type, Dict
 from uuid import UUID
 from dash import html, dcc
@@ -15,47 +16,51 @@ from faas_profiler_core.models import DiskIOCounters
 from faas_profiler.dashboard.analyzers.base import Analyzer
 from faas_profiler_core.models import RecordData
 
+from faas_profiler.utilis import convert_bytes_to_best_unit
+
 
 class DiskIOAnalyzer(Analyzer):
     requested_data = "disk::IOCounters"
     name = "Disk IO Counters"
 
+    BYTES_AXIS_READ = "Read in {unit}"
+    BYTES_AXIS_WRITE = "Write {unit}"
+
+    COUNT_AXIS_READ = "Count Read"
+    COUNT_AXIS_WRITE = "Count Write"
+
+    def analyze_record(self, record_data: Type[RecordData]):
+        """
+
+        """
+        results = DiskIOCounters.load(record_data.results)
+
+        multiplier, bytes_unit = convert_bytes_to_best_unit(max(
+            results.read_bytes, results.write_bytes))
+
+        fig = make_subplots(rows=1, cols=2)
+
+        fig.add_trace(
+            go.Bar(
+                name="Bytes Read and Written",
+                x=[
+                    self.BYTES_AXIS_READ.format(unit=bytes_unit),
+                    self.BYTES_AXIS_WRITE.format(unit=bytes_unit)],
+                y=[
+                    results.read_bytes * multiplier,
+                    results.write_bytes * multiplier]
+            ), row=1, col=1)
+
+        fig.add_trace(
+            go.Bar(
+                name="Count Read and Write Operations",
+                x=[self.COUNT_AXIS_READ, self.COUNT_AXIS_WRITE],
+                y=[results.read_count, results.write_count]
+            ), row=1, col=2)
+
+        return html.Div(
+            dcc.Graph(figure=fig)
+        )
+
     def analyze_profile(self, traces_data: Dict[UUID, Type[RecordData]]):
         return super().analyze_profile(traces_data)
-
-# class DiskIOAnalyzer(Analyzer):
-
-#     def __init__(self, record_data: Type[RecordData]):
-#         self.record_data = record_data
-#         self.record_name = record_data.name
-#         self.results = DiskIOCounters.load(self.record_data.results)
-
-#         super().__init__()
-
-#     def name(self) -> str:
-#         """
-#         Returns the name for Disk IO
-#         """
-#         return "Disk IO Counters"
-
-#     def render(self):
-#         """
-#         Returns a bar chart for all Disk IO Counters
-#         """
-#         bytes_fig = go.Figure([go.Bar(
-#             x=["Bytes read (MB)", "Bytes write (MB)"],
-#             y=[self.results.read_bytes * 1e-6, self.results.write_bytes * 1e-6]
-#         )])
-
-#         counts_fig = go.Figure([go.Bar(
-#             x=["Read count", "Write count"],
-#             y=[self.results.read_bytes, self.results.write_bytes]
-#         )])
-
-#         return html.Div(
-#             dbc.Row(
-#                 [
-#                     dbc.Col(dcc.Graph(figure=bytes_fig)),
-#                     dbc.Col(dcc.Graph(figure=counts_fig))
-#                 ]
-#             ))
