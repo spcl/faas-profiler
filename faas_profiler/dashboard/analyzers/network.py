@@ -4,54 +4,91 @@
 Network Analyzers
 """
 
-import plotly.graph_objects as go
-import dash_bootstrap_components as dbc
+import pandas as pd
 
-from typing import Type
+from uuid import UUID
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import dash_bootstrap_components as dbc
+import plotly.express as px
+
+from typing import Type, Dict, Any, List
 from dash import html, dcc
 
 from faas_profiler_core.models import NetworkIOCounters, NetworkConnections
-from faas_profiler.dashboard.analyzers import Analyzer
 from faas_profiler_core.models import RecordData
 
+from faas_profiler.dashboard.analyzers.base import Analyzer
+from faas_profiler.utilis import bytes_to_kb
 
 class NetworkIOAnalyzer(Analyzer):
+    requested_data = "network::IOCounters"
+    name = "Network IO Counters"
 
-    def __init__(self, record_data: Type[RecordData]):
-        self.record_data = record_data
-        self.record_name = record_data.name
-        self.results = NetworkIOCounters.load(self.record_data.results)
+    def analyze_profile(
+        self,
+        traces_data: Dict[UUID, Type[RecordData]]
+    ) -> Any:
+        df = pd.DataFrame()
+        for trace_id, records in traces_data.items():
+            for record in records:
+                df = df.append(
+                    {"Trace": str(trace_id), **record.results},
+                ignore_index=True)
 
-        super().__init__()
 
-    def name(self) -> str:
-        """
-        Returns the name for the line analyzer
-        """
-        return "Network IO Counters"
+        df2 = df.groupby("Trace").mean()
+        fig = make_subplots(rows=1, cols=2)
 
-    def render(self):
-        """
-        Returns a bar chart for all IO Counters
-        """
+        fig.add_trace(
+            go.Scatter(x=df["Trace"], y=df2["packets_received"], name="Packets received"),
+            row=1, col=1)
+
+        fig.add_trace(
+            go.Scatter(x=df["Trace"], y=df2["packets_sent"], name="Packets sent"),
+            row=1, col=1)
+
+        fig.add_trace(
+            go.Scatter(x=df["Trace"], y=df2["bytes_received"].apply(bytes_to_kb), name="Bytes received (KB)"),
+            row=1, col=2)
+
+        fig.add_trace(
+            go.Scatter(x=df["Trace"], y=df2["bytes_sent"].apply(bytes_to_kb), name="Bytes sent (KB)"),
+            row=1, col=2)
+
+        return html.Div(
+            dcc.Graph(figure=fig)
+        )
+
+ 
+    def analyze_trace(self, record_data: List[Type[RecordData]]):
+        return super().analyze_trace(record_data)
+
+
+    def analyze_record(self, record_data: Type[RecordData]):
+        if not record_data or not record_data.results:
+            return
+
+        _results = NetworkIOCounters.load(record_data.results)
+
         bytes_fig = go.Figure([go.Bar(
-            x=["Bytes sent (MB)", "Bytes received (MB)"],
-            y=[self.results.bytes_sent * 1e-6, self.results.bytes_received * 1e-6]
+            x=["Bytes sent (KB)", "Bytes received (KB)"],
+            y=[bytes_to_kb(_results.bytes_sent), bytes_to_kb(_results.bytes_received)]
         )])
 
         packet_fig = go.Figure([go.Bar(
             x=["Packets sent", "Packets received"],
-            y=[self.results.packets_sent, self.results.packets_received]
+            y=[_results.packets_sent, _results.packets_received]
         )])
 
         error_fig = go.Figure([go.Bar(
             x=["Error In", "Error Out"],
-            y=[self.results.error_in, self.results.error_out]
+            y=[_results.error_in, _results.error_out]
         )])
 
         drop_fig = go.Figure([go.Bar(
             x=["Drop In", "Drop out"],
-            y=[self.results.drop_in, self.results.drop_out]
+            y=[_results.drop_in, _results.drop_out]
         )])
 
         return html.Div(
@@ -65,48 +102,25 @@ class NetworkIOAnalyzer(Analyzer):
             ))
 
 
+
 class NetworkConnectionAnalyzer(Analyzer):
+    requested_data = "network::Connections"
+    name = "Network Connections"
 
-    def __init__(self, record_data: Type[RecordData]):
-        self.record_data = record_data
-        self.record_name = record_data.name
-        self.results = NetworkConnections.load(self.record_data.results)
+    def analyze_record(self, record_data: Type[RecordData]):
+        if not record_data or not record_data.results:
+            return
 
-        super().__init__()
+        df = pd.DataFrame()
+        _results = NetworkConnections.load(record_data.results)
 
-    def name(self) -> str:
-        """
-        Returns the name for the line analyzer
-        """
-        return "Network Connections"
+        for connection in _results.connections:
+            df = df.append({
+                "Connection": f"{connection.remote_address} ({connection.socket_family.name})",
+                "Number of Connections": connection.number_of_connections
+            }, ignore_index=True)
 
-    def render(self):
-        """
-        Returns a bar chart for all IO Counters
-        """
-        connections = self.results.connections
-        if len(connections) == 0:
-            return html.P("No connections recorded.")
-
-        _connection_rows = []
-
-        n = len(connections)
-        num_per_group = 4
-
-        conn_groups = [connections[i:i + n]
-                       for i in range(0, n, num_per_group)]
-        for conn_group in conn_groups:
-            _connection_cards = []
-            for conn in conn_group:
-                _connection_cards.append(dbc.Col(
-                    dbc.Card([dbc.CardBody([
-                        html.P([html.B("Socket Descriptor: "), conn.socket_descriptor], className="card-text"),
-                        html.P([html.B("Socket Family: "), conn.socket_family.name], className="card-text"),
-                        html.P([html.B("Local Address: "), conn.local_address], className="card-text"),
-                        html.P([html.B("Remote Address: "), conn.remote_address], className="card-text")
-                    ])
-                    ])))
-
-            _connection_rows.append(dbc.Row(_connection_cards))
-
-        return html.Div(_connection_rows)
+        fig = px.bar(df, x='Connection', y='Number of Connections')
+        return html.Div(
+            dcc.Graph(figure=fig)
+        )

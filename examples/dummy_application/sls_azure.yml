@@ -1,0 +1,6 @@
+service: dummy_application
+frameworkVersion: '3'
+provider:
+  name: azure
+  runtime: python
+  region: 

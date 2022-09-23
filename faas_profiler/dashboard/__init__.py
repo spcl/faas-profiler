@@ -16,7 +16,8 @@ app = dash.Dash(
     pages_folder="",
     prevent_initial_callbacks=True)
 
-from faas_profiler.dashboard.pages import *
+from faas_profiler.dashboard.pages.index import *
+from faas_profiler.dashboard.pages.profile_view import *
 
 app.layout = dash.html.Div([
     dbc.NavbarSimple(

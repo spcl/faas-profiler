@@ -35,7 +35,7 @@ def profile_card(profile: Type[Profile]) -> dbc.Card:
                     dbc.Badge(f"Traces: {len(profile.trace_ids)}", className="ms-1")
                 ], className="card-title"),
                 dbc.ListGroup(_table_items, flush=True),
-                dbc.Button("View Profile", href=f"/{profile.profile_id}", color="primary"),
+                dbc.Button("View Profile", href=f"/profile/{profile.profile_id}", color="primary"),
             ]
         ),
     ], style={"margin-bottom": "10px"})
@@ -57,18 +57,8 @@ def index():
                     "text-align": "center"}))
 
     return dbc.Container([
-        html.H3(
-            f"AWS Profiles ({config.storage.number_of_profiles})",
-            className="display-8",
-            style={"margin-top": "20px"}
-        ),
         html.Div([profile_card(profile) for profile in config.storage.profiles()]),
-        html.H3(
-            f"GCP Profiles",
-            className="display-8",
-            style={"margin-top": "20px"}
-        )
-    ])
+    ], style={"margin-top": "20px"})
 
 
 dash.register_page(__name__, path="/", layout=index)

@@ -4,11 +4,14 @@
 Contains all serverless functions
 """
 from __future__ import annotations
+from datetime import datetime
 
 from typing import Dict, List, Set, Type
-from uuid import UUID
+from uuid import UUID, uuid4
 from marshmallow_dataclass import dataclass
 from dataclasses import field
+
+from faas_profiler.utilis import short_uuid
 
 from faas_profiler_core import models
 from faas_profiler_core.constants import Provider
@@ -78,6 +81,16 @@ class Profile(models.BaseModel):
 
 
     @property
+    def title(self) -> str:
+        """
+        Return the title of the profile
+        """
+        if not self.function_context:
+            return str(self.profile_id)
+        
+        return f"{self.function_context.function_key} ({short_uuid(self.profile_id)})"
+
+    @property
     def number_of_traces(self) -> int:
         """
         Returns the number of traces.
@@ -91,7 +104,11 @@ class Trace(models.BaseModel):
     """
 
     trace_id: UUID
-    records: List[TraceRecord] = field(default_factory=list)
+    records: Dict[UUID, TraceRecord] = field(default_factory=dict)
+
+    root_record_id: UUID = None
+    invoked_at: datetime = datetime.max
+    finished_at: datetime = datetime.min
 
     def __str__(self) -> str:
         """
@@ -100,41 +117,37 @@ class Trace(models.BaseModel):
         return f"Trace: {self.trace_id} - {len(self.records)} Records"
 
     @property
-    def involved_functions(self) -> set:
+    def duration(self) -> float:
         """
-        Returns a set of involved functions.
+        Returns the duration in ms of the trace.
         """
-        return set([
-            r.record_name for r in self.records])
+        if not self.invoked_at or not self.finished_at:
+            return None
 
-    @property
-    def root_function(self) -> Type[models.FunctionContext]:
+        delta = self.finished_at - self.invoked_at
+        return delta.total_seconds() * 1e4
+    
+    def add_record(self, record: Type[TraceRecord]) -> None:
         """
-        Returns the root function context.
-        """
-        root_record = self.get_root_record()
-        if root_record:
-            return root_record.function_context
-        
+        Adds a record to the trace.
 
-    def get_root_record(self) -> Type[TraceRecord]:
+        Updates the tracing context to set the trace ID correctly.
         """
-        Returns record with no parent ID
+        trace_ctx = record.tracing_context
+        func_ctx = record.function_context
+        if trace_ctx:
+            trace_ctx.trace_id = self.trace_id
+        else:
+            record.tracing_context = models.TracingContext(
+                trace_id=self.trace_id, record_id=uuid4())
 
-        If multiple exists, return the record with oldest invoked at.
-        """
-        root_records = filter(lambda r: not r.tracing_context.parent_id, self.records)
-        root_records = sorted(root_records, key=lambda r: r.function_context.invoked_at, reverse=False)
+        if func_ctx and func_ctx.invoked_at:
+            self.invoked_at = min(self.invoked_at, func_ctx.invoked_at)
 
-        return root_records[0]
+        if func_ctx and func_ctx.finished_at:
+            self.finished_at = max(self.finished_at, func_ctx.finished_at)
 
-    def get_records_by_function(self, function_key: str) -> List[Type[TraceRecord]]:
-        """
-        Returns all records for one function
-        """
-        return [
-            r for r in self.records if r.function_context.function_key == function_key]
-
+        self.records[record.tracing_context.record_id] = record
 
 
 @dataclass
@@ -156,10 +169,6 @@ class TraceRecord(models.TraceRecord):
             record_str += " - ({:.2f} ms)".format(self.total_execution_time)
 
         return record_str
-
-    def get_data_by_name(self, name: str) -> List[models.RecordData]:
-        return [
-            data for data in self.data if data.name == name]
 
     @property
     def function_key(self) -> str:
@@ -231,13 +240,3 @@ class TraceRecord(models.TraceRecord):
 
         delta = func_ctx.handler_finished_at - func_ctx.handler_executed_at
         return delta.total_seconds() * 1000
-
-    @property
-    def is_root(self) -> bool:
-        """
-        Returns True if record is root
-        """
-        if not self.tracing_context:
-            return True
-
-        return self.tracing_context.parent_id is None

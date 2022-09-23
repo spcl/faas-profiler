@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "serverless-google-cloudfunctions": "^4.6.0"
+  }
+}

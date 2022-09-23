@@ -13,33 +13,23 @@ from typing import Type
 from dash import html, dcc
 
 from faas_profiler_core.models import CPUUsage
-from faas_profiler.core import ProfileAccess
 
-from faas_profiler.dashboard.analyzers import Analyzer
+from faas_profiler.dashboard.analyzers.base import Analyzer
 from faas_profiler_core.models import RecordData
 
 
 class CPUUsageAnalyzer(Analyzer):
+    requested_data = "cpu::Usage"
+    name = "CPU Usage"
 
-    def __init__(self, record_data: Type[RecordData]):
-        self.record_data = record_data
-        self.record_name = record_data.name
-        self.results = CPUUsage.load(self.record_data.results)
-
-        super().__init__()
-
-    def name(self) -> str:
-        """
-        Returns the name for the line analyzer
-        """
-        return "CPU Usage"
-
-    def render(self):
+    def analyze_record(self, record_data: Type[RecordData]):
         """
         Returns a line chart for all recorded memory usages.
         """
-        interval = self.results.interval
-        measuring_points = self.results.measuring_points
+        results = CPUUsage.load(record_data.results)
+
+        interval = results.interval
+        measuring_points = results.measuring_points
 
         if len(measuring_points) == 0:
             return html.P("No cpu usages recorded.")
@@ -72,32 +62,32 @@ class CPUUsageAnalyzer(Analyzer):
         ])
 
 
-class ProfileCPUUsageAnalyzer(Analyzer):
+# class ProfileCPUUsageAnalyzer(Analyzer):
 
-    def __init__(self, profile_access: Type[ProfileAccess]):
-        self.profile_access = profile_access
-        self.all_cpu_data = self.profile_access.get_all_record_data(
-            "cpu::Usage")
-        super().__init__()
+#     def __init__(self, profile_access: Type[ProfileAccess]):
+#         self.profile_access = profile_access
+#         self.all_cpu_data = self.profile_access.get_all_record_data(
+#             "cpu::Usage")
+#         super().__init__()
 
-    def name(self) -> str:
-        return "Profile CPU Usage"
+#     def name(self) -> str:
+#         return "Profile CPU Usage"
 
-    def render(self):
-        fig = go.Figure()
-        for trace, trace_data in self.all_cpu_data.items():
-            fig.add_trace(go.Bar(
-                x=list(trace_data.keys()),
-                y=[np.average(f["measuring_points"]) for f in trace_data.values()],
-                name=str(trace),
-                xaxis=None
-            ))
+#     def render(self):
+#         fig = go.Figure()
+#         for trace, trace_data in self.all_cpu_data.items():
+#             fig.add_trace(go.Bar(
+#                 x=list(trace_data.keys()),
+#                 y=[np.average(f["measuring_points"]) for f in trace_data.values()],
+#                 name=str(trace),
+#                 xaxis=None
+#             ))
 
-        fig.update_layout(
-            barmode='group',
-            xaxis_visible=False,
-            xaxis_showticklabels=False)
+#         fig.update_layout(
+#             barmode='group',
+#             xaxis_visible=False,
+#             xaxis_showticklabels=False)
 
-        return html.Div([
-            dcc.Graph(figure=fig)
-        ])
+#         return html.Div([
+#             dcc.Graph(figure=fig)
+#         ])
