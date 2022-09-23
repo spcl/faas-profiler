@@ -25,7 +25,7 @@ from faas_profiler_core.models import NetworkIOCounters, NetworkConnections
 from faas_profiler_core.models import RecordData
 
 from faas_profiler.dashboard.analyzers.base import Analyzer
-from faas_profiler.utilis import bytes_to_kb, get_idx_safely
+from faas_profiler.utilis import bytes_to_kb, get_idx_safely, convert_bytes_to_best_unit, short_uuid
 
 
 class NetworkIOAnalyzer(Analyzer):
@@ -82,7 +82,67 @@ class NetworkIOAnalyzer(Analyzer):
             dcc.Graph(figure=fig)
         )
 
-    def analyze_trace(self, record_data: List[Type[RecordData]]):
+    def analyze_trace(
+        self,
+        record_data: Dict[str, Type[RecordData]]
+    ):
+        df = pd.DataFrame()
+
+        for record_id, data in record_data.items():
+            results = NetworkIOCounters.load(data.results)
+            df = df.append({
+                "Record ID": short_uuid(record_id),
+                "Bytes Sent": results.bytes_sent,
+                "Bytes Received": results.bytes_received,
+                "Packets Sent": results.packets_sent,
+                "Packets Received": results.packets_received,
+                "Error In": results.error_in,
+                "Error Out": results.error_out,
+                "Drop In": results.drop_in,
+                "Drop Out": results.drop_out
+            }, ignore_index=True)
+
+        bytes_peak = max(df["Bytes Sent"].max(), df["Bytes Received"].max())
+        multiplier, bytes_unit = convert_bytes_to_best_unit(bytes_peak)
+        df['Bytes Sent'] = df['Bytes Sent'].apply(lambda x: x * multiplier)
+        df['Bytes Received'] = df['Bytes Received'].apply(
+            lambda x: x * multiplier)
+
+        bytes_fig = px.line(
+            df,
+            title=f"Bytes Sent/Received by Record ({bytes_unit})",
+            x="Record ID",
+            y=["Bytes Sent", "Bytes Received"])
+
+        packet_fig = px.line(
+            df,
+            title=f"Packets Sent/Received by Record",
+            x="Record ID",
+            y=["Packets Sent", "Packets Received"])
+
+        error_fig = px.line(
+            df,
+            title=f"Error In/Out by Record",
+            x="Record ID",
+            y=["Error In", "Error Out"])
+
+        drop_fig = px.line(
+            df,
+            title=f"Drop In/Out Record",
+            x="Record ID",
+            y=["Drop In", "Drop Out"])
+
+        return html.Div([
+            dbc.Row([
+                dbc.Col(dcc.Graph(figure=bytes_fig)),
+                dbc.Col(dcc.Graph(figure=packet_fig))
+            ]),
+            dbc.Row([
+                dbc.Col(dcc.Graph(figure=error_fig)),
+                dbc.Col(dcc.Graph(figure=drop_fig))
+            ])
+        ])
+
         return super().analyze_trace(record_data)
 
     def analyze_record(self, record_data: Type[RecordData]):
