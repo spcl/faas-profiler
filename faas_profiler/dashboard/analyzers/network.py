@@ -4,7 +4,13 @@
 Network Analyzers
 """
 
+from unicodedata import name
+from xml import dom
 import pandas as pd
+
+import dns.resolver
+import dns.reversename
+from socket import getservbyport
 
 from uuid import UUID
 import plotly.graph_objects as go
@@ -19,7 +25,8 @@ from faas_profiler_core.models import NetworkIOCounters, NetworkConnections
 from faas_profiler_core.models import RecordData
 
 from faas_profiler.dashboard.analyzers.base import Analyzer
-from faas_profiler.utilis import bytes_to_kb
+from faas_profiler.utilis import bytes_to_kb, get_idx_safely
+
 
 class NetworkIOAnalyzer(Analyzer):
     requested_data = "network::IOCounters"
@@ -34,36 +41,49 @@ class NetworkIOAnalyzer(Analyzer):
             for record in records:
                 df = df.append(
                     {"Trace": str(trace_id), **record.results},
-                ignore_index=True)
-
+                    ignore_index=True)
 
         df2 = df.groupby("Trace").mean()
         fig = make_subplots(rows=1, cols=2)
 
         fig.add_trace(
-            go.Scatter(x=df["Trace"], y=df2["packets_received"], name="Packets received"),
-            row=1, col=1)
+            go.Scatter(
+                x=df["Trace"],
+                y=df2["packets_received"],
+                name="Packets received"),
+            row=1,
+            col=1)
 
         fig.add_trace(
-            go.Scatter(x=df["Trace"], y=df2["packets_sent"], name="Packets sent"),
-            row=1, col=1)
+            go.Scatter(
+                x=df["Trace"],
+                y=df2["packets_sent"],
+                name="Packets sent"),
+            row=1,
+            col=1)
 
         fig.add_trace(
-            go.Scatter(x=df["Trace"], y=df2["bytes_received"].apply(bytes_to_kb), name="Bytes received (KB)"),
-            row=1, col=2)
+            go.Scatter(
+                x=df["Trace"],
+                y=df2["bytes_received"].apply(bytes_to_kb),
+                name="Bytes received (KB)"),
+            row=1,
+            col=2)
 
         fig.add_trace(
-            go.Scatter(x=df["Trace"], y=df2["bytes_sent"].apply(bytes_to_kb), name="Bytes sent (KB)"),
-            row=1, col=2)
+            go.Scatter(
+                x=df["Trace"],
+                y=df2["bytes_sent"].apply(bytes_to_kb),
+                name="Bytes sent (KB)"),
+            row=1,
+            col=2)
 
         return html.Div(
             dcc.Graph(figure=fig)
         )
 
- 
     def analyze_trace(self, record_data: List[Type[RecordData]]):
         return super().analyze_trace(record_data)
-
 
     def analyze_record(self, record_data: Type[RecordData]):
         if not record_data or not record_data.results:
@@ -102,25 +122,54 @@ class NetworkIOAnalyzer(Analyzer):
             ))
 
 
-
 class NetworkConnectionAnalyzer(Analyzer):
     requested_data = "network::Connections"
     name = "Network Connections"
 
+    UNKNOWN_IP = "Unknown IP"
+    UNKNOWN_PORT = "Unknown Port"
+    UNKNOWN_DOMAIN = "Unknown Domain"
+    UNKNOWN_APPLICATION = "Unknown Application"
+
     def analyze_record(self, record_data: Type[RecordData]):
-        if not record_data or not record_data.results:
-            return
-
+        results = NetworkConnections.load(record_data.results)
         df = pd.DataFrame()
-        _results = NetworkConnections.load(record_data.results)
 
-        for connection in _results.connections:
+        for connection in results.connections:
+            ip_split = str(connection.remote_address).split(":")
+            ip_addr = get_idx_safely(ip_split, 0, self.UNKNOWN_IP)
+            port = get_idx_safely(ip_split, 1, self.UNKNOWN_PORT)
+
+            domain = self.UNKNOWN_DOMAIN
+            application = self.UNKNOWN_APPLICATION
+
+            if ip_addr != self.UNKNOWN_IP:
+                try:
+                    reverse_dns = dns.reversename.from_address(ip_addr)
+                    domain = str(dns.resolver.resolve(reverse_dns, "PTR")[0])
+                except BaseException:
+                    pass
+
+            if port != self.UNKNOWN_PORT:
+                try:
+                    application = getservbyport(int(port))
+                except BaseException:
+                    pass
+
             df = df.append({
-                "Connection": f"{connection.remote_address} ({connection.socket_family.name})",
-                "Number of Connections": connection.number_of_connections
+                "IP Address": ip_addr,
+                "Port": port,
+                "Domain": domain,
+                "Application": application
             }, ignore_index=True)
 
-        fig = px.bar(df, x='Connection', y='Number of Connections')
+        fig = px.bar(
+            df,
+            title="Connections by Domain",
+            x="Domain",
+            color="Application",
+            text="IP Address")
+
         return html.Div(
             dcc.Graph(figure=fig)
         )
