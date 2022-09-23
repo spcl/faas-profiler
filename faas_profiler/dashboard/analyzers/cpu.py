@@ -9,11 +9,13 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
+import dash_bootstrap_components as dbc
 from typing import Type
 from dash import html, dcc
 
 from faas_profiler_core.models import CPUUsage
 
+from faas_profiler.utilis import seconds_to_ms
 from faas_profiler.dashboard.analyzers.base import Analyzer
 from faas_profiler_core.models import RecordData
 
@@ -21,6 +23,9 @@ from faas_profiler_core.models import RecordData
 class CPUUsageAnalyzer(Analyzer):
     requested_data = "cpu::Usage"
     name = "CPU Usage"
+
+    X_AXIS = "Time ({unit})"
+    Y_AXIS = "Usage ({unit})"
 
     def analyze_record(self, record_data: Type[RecordData]):
         """
@@ -36,29 +41,33 @@ class CPUUsageAnalyzer(Analyzer):
 
         n = len(measuring_points)
         measuring_points = np.array(measuring_points)
-        time_interval = np.arange(0, n * interval, interval) * 1e-3
+        time_interval = seconds_to_ms(np.arange(0, n * interval, interval))
 
         data = pd.DataFrame({
-            "Time (ms)": time_interval, "Usage (%)": measuring_points
+            self.X_AXIS.format(unit="ms"): time_interval,
+            self.Y_AXIS.format(unit="%"): measuring_points
         })
-        mean = sum(measuring_points) / n
 
         fig = px.line(
             data,
-            x="Time (ms)",
-            y="Usage (%)",
-            title="Memory-Usage")
+            x=self.X_AXIS.format(unit="ms"),
+            y=self.Y_AXIS.format(unit="%"),
+            title="CPU-Usage")
 
-        fig.add_shape(go.layout.Shape(
-            type="line",
-            x0=time_interval[0],
-            y0=mean,
-            x1=time_interval[-1],
-            y1=mean,
+        fig.add_trace(go.Scatter(
+            x=time_interval,
+            y=np.repeat(np.mean(measuring_points), n),
+            name="Mean",
             line=dict(color="Red", width=2)))
 
         return html.Div([
-            dcc.Graph(figure=fig)
+            dcc.Graph(figure=fig),
+            dbc.Row(
+                [
+                    dbc.Col([html.B("Number of Measuring Points:"), html.P(n)]),
+                    dbc.Col([html.B("Interval:"), html.P(f"{seconds_to_ms(interval)} ms")])
+                ]
+            )
         ])
 
 

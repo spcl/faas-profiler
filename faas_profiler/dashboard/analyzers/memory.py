@@ -50,7 +50,6 @@ class MemoryUsageAnalyzer(Analyzer):
             self.X_AXIS.format(unit="ms"): time_interval,
             self.Y_AXIS.format(unit=bytes_unit): measuring_points
         })
-        mean = sum(measuring_points) / n
 
         fig = px.line(
             data,
@@ -60,12 +59,18 @@ class MemoryUsageAnalyzer(Analyzer):
 
         fig.add_trace(go.Scatter(
             x=time_interval,
-            y=np.repeat(mean, n),
+            y=np.repeat(np.mean(measuring_points), n),
             name="Mean",
             line=dict(color="Red", width=2)))
 
         return html.Div([
-            dcc.Graph(figure=fig)
+            dcc.Graph(figure=fig),
+            dbc.Row(
+                [
+                    dbc.Col([html.B("Number of Measuring Points:"), html.P(n)]),
+                    dbc.Col([html.B("Interval:"), html.P(f"{seconds_to_ms(interval)} ms")])
+                ]
+            )
         ])
 
 
