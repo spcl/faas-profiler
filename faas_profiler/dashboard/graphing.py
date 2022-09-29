@@ -7,12 +7,6 @@ from __future__ import annotations
 
 import dash_cytoscape as cyto
 
-from typing import Type
-
-from os.path import join
-
-from faas_profiler.models import Trace
-
 from faas_profiler_core.constants import TriggerSynchronicity
 
 cyto.load_extra_layouts()
@@ -20,7 +14,7 @@ cyto.load_extra_layouts()
 FUNCTION_NODE = "function_node"
 SERVICE_NODE = "service_node"
 
-NODE_SIZE_LIMIT = (10,100)
+NODE_SIZE_LIMIT = (10, 100)
 EDGE_SIZE_LIMIT = (2, 20)
 
 """
