@@ -5,93 +5,96 @@ Network Analyzers
 """
 
 import pandas as pd
-import numpy as np
-
-from uuid import UUID
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import dash_bootstrap_components as dbc
 import plotly.express as px
 
-from typing import Type, Dict, Any, List
 from dash import html, dcc
 
-from faas_profiler_core.models import S3Capture, S3AccessItem
-from faas_profiler_core.models import RecordData
+from faas_profiler_core.models import EFSAccesses, S3Accesses
 
 from faas_profiler.dashboard.analyzers.base import Analyzer
-from faas_profiler.utilis import bytes_to_kb
+from faas_profiler.utilis import convert_bytes_to_best_unit
+
+
+class EFSCaptureAnalyzer(Analyzer):
+    requested_data = "aws::EFSAccess"
+    name = "EFS Access Capture"
+
+    def analyze_profile(self, traces_data):
+        df = pd.DataFrame()
+
+        for idx, (trace_id, trace_data) in enumerate(traces_data.items()):
+            for record_data in trace_data.values():
+                record_result = EFSAccesses.load(record_data.results)
+                for access in record_result.accesses:
+                    if not access.file_size or not access.execution_time:
+                        continue
+
+                    bandwidth = access.file_size / \
+                        (.001 * access.execution_time)
+                    df = pd.concat([df, pd.DataFrame({
+                        "Mode": access.mode,
+                        "Bandwidth": bandwidth,
+                        "Trace ID": str(trace_id)[:8],
+                        "EFS Mount": record_result.mount_point
+                    }, index=[idx])])
+
+        multiplier, bytes_unit = convert_bytes_to_best_unit(
+            df["Bandwidth"].max())
+        df['Bandwidth'] = df['Bandwidth'].apply(lambda x: x * multiplier) * 8
+
+        fig = px.line(
+            df,
+            x="Trace ID",
+            y="Bandwidth",
+            color="Mode",
+            title=f"EFS Bandwidth ({bytes_unit}it/sec)")
+
+        fig.add_hline(
+            y=df['Bandwidth'].mean(),
+            name="Mean",
+            line=dict(color="Red", width=2))
+
+        return html.Div([
+            dcc.Graph(figure=fig),
+        ])
+
 
 class S3CaptureAnalyzer(Analyzer):
     requested_data = "aws::S3Access"
     name = "S3 Access Capture"
 
-    def analyze_record(self, record_data: Type[RecordData]):
-        if not record_data or not record_data.results:
-            return
+    def analyze_profile(self, traces_data):
+        df = pd.DataFrame()
 
-        _results = [S3Capture.load(r) for r in record_data.results]
+        for idx, (trace_id, trace_data) in enumerate(traces_data.items()):
+            for record_data in trace_data.values():
+                record_result = S3Accesses.load(record_data.results)
 
-        _bucket_cards = []
-        for bucket_accesses in _results:
-            _bucket_cards.append(self._make_bucket_card(bucket_accesses))
+                for access in record_result.accesses:
+                    if not access.object_size or not access.execution_time:
+                        continue
 
-        return html.Div(_bucket_cards)
+                    bandwidth = access.object_size / \
+                        (.001 * access.execution_time)
+                    df = pd.concat([df, pd.DataFrame({
+                        "Mode": access.mode,
+                        "Bandwidth": bandwidth,
+                        "Trace ID": str(trace_id)[:8],
+                        "Bucket": access.bucket_name
+                    }, index=[idx])])
 
+        multiplier, bytes_unit = convert_bytes_to_best_unit(
+            df["Bandwidth"].max())
+        df['Bandwidth'] = df['Bandwidth'].apply(lambda x: x * multiplier) * 8
 
-    def _make_bucket_card(self, s3_capture: Type[S3Capture]):
-        print(s3_capture)
+        fig = px.line(
+            df,
+            line_group="Bucket",
+            x="Trace ID",
+            y="Bandwidth",
+            color="Mode",
+            title=f"S3 Bandwidth ({bytes_unit}it/sec)")
 
-    
-        _get_table = "No records"
-        if s3_capture.get_objects:
-            _get_table = self._make_object_table(s3_capture.get_objects)
-
-        _create_table = "No records"
-        if s3_capture.create_objects:
-            _create_table = self._make_object_table(s3_capture.create_objects)
-
-        _delete_table = "No records"
-        if s3_capture.deleted_objects:
-            _delete_table = self._make_object_table(s3_capture.deleted_objects)
-
-        _head_table = "No records"
-        if s3_capture.head_objects:
-            _head_table = self._make_object_table(s3_capture.head_objects)
-
-        return dbc.Card(
-            dbc.CardBody(
-                [
-                    html.H4([html.B("Bucket: "), s3_capture.bucket_name], className="card-title"),
-                    html.H6(html.B("Get Operations"), className="card-subtitle"),
-                    html.Div(_get_table),
-                    html.H6(html.B("Create Operations"), className="card-subtitle"),
-                    html.Div(_create_table),
-                    html.H6(html.B("Delete Operations"), className="card-subtitle"),
-                    html.Div(_delete_table),
-                    html.H6(html.B("Head Operations"), className="card-subtitle"),
-                    html.Div(_head_table)
-                ]
-            ), style={"margin-bottom": "20px"})
-
-    def _make_object_table(self, s3_accesses: List[Type[S3AccessItem]]):
-        header = html.Thead(
-            html.Tr([
-                html.Th("Object Key"),
-                html.Th("Number of Accesses"),
-                html.Th("Avg Execution Time")
-            ]))
-
-        rows = []
-        for item in s3_accesses:
-            _row = []
-            _row.extend([html.Td(item.object_key), html.Td(len(item.execution_times))])
-
-            if item.execution_times:
-                _row.append(
-                    html.Td("{:.2f} ms".format(np.mean(item.execution_times))))
-            
-            rows.append(html.Tr(_row))
-
-        return dbc.Table([header, html.Tbody(rows)], bordered=True)
-            
+        return html.Div([
+            dcc.Graph(figure=fig),
+        ])

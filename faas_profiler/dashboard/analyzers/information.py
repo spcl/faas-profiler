@@ -4,16 +4,10 @@
 Information Analyzers
 """
 
-import numpy as np
-import pandas as pd
-
 import dash_bootstrap_components as dbc
-import plotly.graph_objects as go
-import plotly.express as px
 
-from typing import Any, Dict, List, Tuple, Type
-from dash import html, dcc
-from uuid import UUID
+from typing import List, Type
+from dash import html
 
 from faas_profiler_core.models import InformationOperatingSystem, InformationEnvironment
 from faas_profiler.dashboard.analyzers.base import Analyzer
@@ -26,57 +20,57 @@ from faas_profiler.utilis import seconds_to_ms
 Time Shift
 """
 
+
 class TimeShiftAnalyzer(Analyzer):
     requested_data = "information::TimeShift"
     name = "Time Shift"
 
     UNKNOWN = "Unknown server"
 
-    def analyze_profile(
-        self,
-        traces_data: Dict[UUID, Type[RecordData]]
-    ) -> Any:
-        df = pd.DataFrame()
+    # def analyze_profile(
+    #     self,
+    #     traces_data: Dict[UUID, Type[RecordData]]
+    # ) -> Any:
+    #     df = pd.DataFrame()
 
-        for trace_id, records in traces_data.items():
-            for record in records:
-                if not record.results:
-                    continue
-            
-                _server = record.results.get("server", self.UNKNOWN)
-                _offset = record.results.get("offset")
-                
-                df = df.append({
-                    "Trace": str(trace_id),
-                    "NTP Server": _server,
-                    "Offset (ms)": seconds_to_ms(_offset)
-                }, ignore_index=True)
+    #     for trace_id, records in traces_data.items():
+    #         for record in records:
+    #             if not record.results:
+    #                 continue
 
-        time_shift_per_trace = px.line(
-            df.groupby(['Trace'], as_index=False).mean(),
-            x="Trace",
-            y='Offset (ms)',
-            title="Time Shift Offset in ms by Trace")
+    #             _server = record.results.get("server", self.UNKNOWN)
+    #             _offset = record.results.get("offset")
 
-        time_shift_per_trace.add_hline(df["Offset (ms)"].mean(), line=dict(color="Red", width=2))
+    #             df = df.append({
+    #                 "Trace": str(trace_id),
+    #                 "NTP Server": _server,
+    #                 "Offset (ms)": seconds_to_ms(_offset)
+    #             }, ignore_index=True)
 
-        time_shift_per_server = px.bar(
-            df.groupby(['NTP Server'], as_index=False).mean(),
-            x="NTP Server",
-            y='Offset (ms)',
-            title="Time Shift Offset in ms by NTP Server")
+    #     time_shift_per_trace = px.line(
+    #         df.groupby(['Trace'], as_index=False).mean(),
+    #         x="Trace",
+    #         y='Offset (ms)',
+    #         title="Time Shift Offset in ms by Trace")
 
-        return html.Div(
-            dbc.Row(
-                [
-                    dbc.Col(dcc.Graph(figure=time_shift_per_trace)),
-                    dbc.Col(dcc.Graph(figure=time_shift_per_server))
-                ]
-            ))
+    #     time_shift_per_trace.add_hline(df["Offset (ms)"].mean(), line=dict(color="Red", width=2))
+
+    #     time_shift_per_server = px.bar(
+    #         df.groupby(['NTP Server'], as_index=False).mean(),
+    #         x="NTP Server",
+    #         y='Offset (ms)',
+    #         title="Time Shift Offset in ms by NTP Server")
+
+    #     return html.Div(
+    #         dbc.Row(
+    #             [
+    #                 dbc.Col(dcc.Graph(figure=time_shift_per_trace)),
+    #                 dbc.Col(dcc.Graph(figure=time_shift_per_server))
+    #             ]
+    #         ))
 
     def analyze_trace(self, record_data: List[Type[RecordData]]):
         return super().analyze_trace(record_data)
-
 
     def analyze_record(self, record_data: Type[RecordData]):
         if not record_data or not record_data.results:
@@ -94,47 +88,46 @@ class TimeShiftAnalyzer(Analyzer):
                 ])
             ))
 
+
 class IsWarmAnalyzer(Analyzer):
     requested_data = "information::IsWarm"
     name = "Invocations To Warm Container"
 
+    # def analyze_profile(
+    #     self,
+    #     traces_data: Dict[UUID, Type[RecordData]]
+    # ) -> Any:
+    #     df = pd.DataFrame()
 
-    def analyze_profile(
-        self,
-        traces_data: Dict[UUID, Type[RecordData]]
-    ) -> Any:
-        df = pd.DataFrame()
+    #     for trace_id, records in traces_data.items():
+    #         for record in records:
+    #             if not record.results:
+    #                 continue
 
-        for trace_id, records in traces_data.items():
-            for record in records:
-                if not record.results:
-                    continue
-            
-                _is_warm = bool(record.results.get("is_warm"))
-                _warm_for = record.results.get("warm_for")
+    #             _is_warm = bool(record.results.get("is_warm"))
+    #             _warm_for = record.results.get("warm_for")
 
-                df = df.append({
-                    "Trace": str(trace_id),
-                    "Is Warm": _is_warm,
-                    "Warm for seconds": _warm_for
-                }, ignore_index=True)
+    #             df = df.append({
+    #                 "Trace": str(trace_id),
+    #                 "Is Warm": _is_warm,
+    #                 "Warm for seconds": _warm_for
+    #             }, ignore_index=True)
 
-        warm_for_bars = px.bar(
-            df.groupby(['Trace'], as_index=False).mean(),
-            x="Trace",
-            y='Warm for seconds',
-            title="Average Warm for seconds per Trace")
+    #     warm_for_bars = px.bar(
+    #         df.groupby(['Trace'], as_index=False).mean(),
+    #         x="Trace",
+    #         y='Warm for seconds',
+    #         title="Average Warm for seconds per Trace")
 
-        warm_cold_pie = px.pie(df, names='Is Warm')
+    #     warm_cold_pie = px.pie(df, names='Is Warm')
 
-        return html.Div(
-            dbc.Row(
-                [
-                    dbc.Col(dcc.Graph(figure=warm_cold_pie)),
-                    dbc.Col(dcc.Graph(figure=warm_for_bars))
-                ]
-            ))
-        
+    #     return html.Div(
+    #         dbc.Row(
+    #             [
+    #                 dbc.Col(dcc.Graph(figure=warm_cold_pie)),
+    #                 dbc.Col(dcc.Graph(figure=warm_for_bars))
+    #             ]
+    #         ))
 
     def analyze_trace(self, record_data: List[Type[RecordData]]):
         return super().analyze_trace(record_data)
@@ -143,7 +136,6 @@ class IsWarmAnalyzer(Analyzer):
         if not record_data or not record_data.results:
             return
 
-        print(record_data.results)
         _results = record_data.results
         _is_warm = _results.get("is_warm")
         _warm_for = _results.get("warm_for")
@@ -164,7 +156,6 @@ class IsWarmAnalyzer(Analyzer):
                     html.H4(_warm_since, className="display-7")
                 ])))
             ]))
-
 
 
 class EnvironmentAnalyzer(Analyzer):

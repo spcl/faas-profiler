@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from .memory import *
-from .cpu import *
-from .network import *
-from .disk import *
-from .captures import *
-from .information import *
-
-
+from .memory import * # noqa
+from .cpu import * # noqa
+from .network import * # noqa
+from .disk import * # noqa
+from .captures import * # noqa
+from .information import * # noqa

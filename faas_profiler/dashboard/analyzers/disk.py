@@ -4,8 +4,11 @@
 Network Analyzers
 """
 
+import pandas as pd
+
 import plotly.graph_objects as go
 import dash_bootstrap_components as dbc
+import plotly.express as px
 
 from plotly.subplots import make_subplots
 from typing import Type, Dict
@@ -16,7 +19,7 @@ from faas_profiler_core.models import DiskIOCounters
 from faas_profiler.dashboard.analyzers.base import Analyzer
 from faas_profiler_core.models import RecordData
 
-from faas_profiler.utilis import convert_bytes_to_best_unit
+from faas_profiler.utilis import convert_bytes_to_best_unit, short_uuid
 
 
 class DiskIOAnalyzer(Analyzer):
@@ -28,6 +31,46 @@ class DiskIOAnalyzer(Analyzer):
 
     COUNT_AXIS_READ = "Count Read"
     COUNT_AXIS_WRITE = "Count Write"
+
+    def analyze_trace(
+        self,
+        record_data: Dict[str, Type[RecordData]]
+    ):
+        df = pd.DataFrame()
+
+        for record_id, data in record_data.items():
+            results = DiskIOCounters.load(data.results)
+            df = df.append({
+                "Record ID": short_uuid(record_id),
+                "Bytes Read": results.read_bytes,
+                "Bytes Write": results.write_bytes,
+                "Count Read": results.read_count,
+                "Count Write": results.write_count,
+            }, ignore_index=True)
+
+        bytes_peak = max(df["Bytes Read"].max(), df["Bytes Write"].max())
+        multiplier, bytes_unit = convert_bytes_to_best_unit(bytes_peak)
+        df['Bytes Write'] = df['Bytes Write'].apply(lambda x: x * multiplier)
+        df['Bytes Read'] = df['Bytes Read'].apply(lambda x: x * multiplier)
+
+        bytes_fig = px.line(
+            df,
+            title=f"Bytes Read/Write by Record ({bytes_unit})",
+            x="Record ID",
+            y=["Bytes Read", "Bytes Write"])
+
+        count_fig = px.line(
+            df,
+            title="Count Read/Write by Record",
+            x="Record ID",
+            y=["Count Read", "Count Write"])
+
+        return html.Div([
+            dbc.Row([
+                dbc.Col(dcc.Graph(figure=bytes_fig)),
+                dbc.Col(dcc.Graph(figure=count_fig))
+            ])
+        ])
 
     def analyze_record(self, record_data: Type[RecordData]):
         """

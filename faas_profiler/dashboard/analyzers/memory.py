@@ -8,10 +8,10 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import dash_bootstrap_components as dbc
-from typing import Type
+from typing import Type, Dict
 from dash import html, dcc
 
-from faas_profiler_core.models import MemoryLineUsage, MemoryUsage
+from faas_profiler_core.models import MemoryUsage
 
 from faas_profiler.dashboard.analyzers.base import Analyzer
 from faas_profiler_core.models import RecordData
@@ -32,47 +32,141 @@ class MemoryUsageAnalyzer(Analyzer):
         """
         results = MemoryUsage.load(record_data.results)
 
-        interval = results.interval
-        measuring_points = results.measuring_points
+        rss_times, rss = zip(*results.rss)
+        vms_times, vms = zip(*results.vms)
 
-        if len(measuring_points) == 0:
-            return html.P("No memory usages recorded.")
+        rss_interval = np.array(rss_times) - rss_times[0]
+        vms_interval = np.array(vms_times) - vms_times[0]
 
-        n = len(measuring_points)
-        measuring_points = np.array(measuring_points)
-        peak = np.max(measuring_points)
-        multiplier, bytes_unit = convert_bytes_to_best_unit(peak)
-
-        measuring_points = measuring_points * multiplier
-        time_interval = seconds_to_ms(np.arange(0, n * interval, interval))
-
-        data = pd.DataFrame({
-            self.X_AXIS.format(unit="ms"): time_interval,
-            self.Y_AXIS.format(unit=bytes_unit): measuring_points
+        rss_df = pd.DataFrame({
+            "Time (ms)": seconds_to_ms(rss_interval),
+            "Usage": np.array(rss),
+        })
+        vms_df = pd.DataFrame({
+            "Time (ms)": seconds_to_ms(vms_interval),
+            "Usage": np.array(vms),
         })
 
-        fig = px.line(
-            data,
-            x=self.X_AXIS.format(unit="ms"),
-            y=self.Y_AXIS.format(unit=bytes_unit),
-            title="Memory-Usage")
+        rss_multiplier, rss_bytes_unit = convert_bytes_to_best_unit(
+            rss_df["Usage"].max())
+        vms_multiplier, vms_bytes_unit = convert_bytes_to_best_unit(
+            vms_df["Usage"].max())
+        rss_df['Usage'] = rss_df['Usage'].apply(lambda x: x * rss_multiplier)
+        vms_df['Usage'] = vms_df['Usage'].apply(lambda x: x * vms_multiplier)
 
-        fig.add_trace(go.Scatter(
-            x=time_interval,
-            y=np.repeat(np.mean(measuring_points), n),
+        rss_fig = px.line(
+            rss_df,
+            x="Time (ms)",
+            y="Usage",
+            title=f"Memory-Usage ({rss_bytes_unit})")
+
+        rss_fig.add_trace(go.Scatter(
+            x=seconds_to_ms(np.array(rss_interval)),
+            y=np.repeat(rss_df['Usage'].mean(), len(rss)),
+            name="Mean",
+            line=dict(color="Red", width=2)))
+
+        vms_fig = px.line(
+            vms_df,
+            x="Time (ms)",
+            y="Usage",
+            title=f"Memory-Usage ({vms_bytes_unit})")
+
+        vms_fig.add_trace(go.Scatter(
+            x=seconds_to_ms(np.array(vms_interval)),
+            y=np.repeat(vms_df['Usage'].mean(), len(vms)),
             name="Mean",
             line=dict(color="Red", width=2)))
 
         return html.Div([
-            dcc.Graph(figure=fig),
+            dcc.Graph(figure=rss_fig),
+            dcc.Graph(figure=vms_fig),
             dbc.Row(
                 [
-                    dbc.Col([html.B("Number of Measuring Points:"), html.P(n)]),
-                    dbc.Col([html.B("Interval:"), html.P(f"{seconds_to_ms(interval)} ms")])
+                    dbc.Col([html.B("Number of Measuring Points:"), html.P(len(np.array(rss)))]),
+                    dbc.Col([html.B("Interval:"), html.P(f"{seconds_to_ms(results.interval)} ms")])
                 ]
             )
         ])
 
+    def analyze_trace(
+        self,
+        record_data: Dict[str, Type[RecordData]]
+    ):
+        rss_df = pd.DataFrame()
+        vms_df = pd.DataFrame()
+
+        for record_id, data in record_data.items():
+            results = MemoryUsage.load(data.results)
+            rss_times, rss = zip(*results.rss)
+            vms_times, vms = zip(*results.vms)
+
+            rss_df = rss_df.append(pd.DataFrame({
+                "Time (ms)": seconds_to_ms(np.array(rss_times) - rss_times[0]),
+                "Usage": np.array(rss),
+                "Record ID": str(record_id)
+            }))
+            vms_df = vms_df.append(pd.DataFrame({
+                "Time (ms)": seconds_to_ms(np.array(vms_times) - vms_times[0]),
+                "Usage": np.array(vms),
+                "Record ID": str(record_id)
+            }))
+
+        rss_multiplier, rss_bytes_unit = convert_bytes_to_best_unit(
+            rss_df["Usage"].max())
+        vms_multiplier, vms_bytes_unit = convert_bytes_to_best_unit(
+            vms_df["Usage"].max())
+        rss_df['Usage'] = rss_df['Usage'].apply(lambda x: x * rss_multiplier)
+        vms_df['Usage'] = vms_df['Usage'].apply(lambda x: x * vms_multiplier)
+
+        rss_fig = px.line(
+            rss_df,
+            title=f"Memory Usage (RSS) by Record ({rss_bytes_unit})",
+            x="Time (ms)",
+            y="Usage",
+            color="Record ID")
+
+        vms_fig = px.line(
+            vms_df,
+            title=f"Virtual Memory Size by Record ({vms_bytes_unit})",
+            x="Time (ms)",
+            y="Usage",
+            color="Record ID")
+
+        return html.Div([
+            dcc.Graph(figure=rss_fig),
+            dcc.Graph(figure=vms_fig)
+        ])
+
+    def analyze_profile(self, traces_data):
+        df = pd.DataFrame()
+        for idx, (trace_id, trace_data) in enumerate(traces_data.items()):
+
+            trace_usage = []
+            for record_data in trace_data.values():
+                record_result = MemoryUsage.load(record_data.results)
+                _, usage = zip(*record_result.rss)
+                trace_usage += usage
+
+            df = pd.concat([df, pd.DataFrame({
+                "Trace ID": str(trace_id)[:8],
+                "Average Usage": np.array(trace_usage).mean()
+            }, index=[idx])])
+
+        multiplier, bytes_unit = convert_bytes_to_best_unit(
+            df["Average Usage"].max())
+        df['Average Usage'] = df['Average Usage'].apply(
+            lambda x: x * multiplier)
+
+        fig = px.line(
+            df,
+            x="Trace ID",
+            y="Average Usage",
+            title=f"Memory-Usage ({bytes_unit})")
+
+        return html.Div([
+            dcc.Graph(figure=fig)
+        ])
 
 # class LineMemoryAnalyzer(Analyzer):
 
@@ -121,59 +215,6 @@ class MemoryUsageAnalyzer(Analyzer):
 #             borderless=True,
 #             bordered=False,
 #             color="light")
-
-
-# class MemoryUsageAnalyzer(Analyzer):
-
-#     def __init__(self, record_data: Type[RecordData]):
-#         self.record_data = record_data
-#         self.record_name = record_data.name
-#         self.results = MemoryUsage.load(self.record_data.results)
-
-#         super().__init__()
-
-#     def name(self) -> str:
-#         """
-#         Returns the name for the line analyzer
-#         """
-#         return "Memory Usage"
-
-#     def render(self):
-#         """
-#         Returns a line chart for all recorded memory usages.
-#         """
-#         interval = self.results.interval
-#         measuring_points = self.results.measuring_points
-
-#         if len(measuring_points) == 0:
-#             return html.P("No memory usages recorded.")
-
-#         n = len(measuring_points)
-#         measuring_points = np.array(measuring_points) * 1e-6
-#         time_interval = np.arange(0, n * interval, interval) * 1e-3
-
-#         data = pd.DataFrame({
-#             "Time (ms)": time_interval, "Usage (MB)": measuring_points
-#         })
-#         mean = sum(measuring_points) / n
-
-#         fig = px.line(
-#             data,
-#             x="Time (ms)",
-#             y="Usage (MB)",
-#             title="Memory-Usage")
-
-#         fig.add_shape(go.layout.Shape(
-#             type="line",
-#             x0=time_interval[0],
-#             y0=mean,
-#             x1=time_interval[-1],
-#             y1=mean,
-#             line=dict(color="Red", width=2)))
-
-#         return html.Div([
-#             dcc.Graph(figure=fig)
-#         ])
 
 
 # class ProfileMemoryUsageAnalyzer(Analyzer):
