@@ -9,7 +9,7 @@ from dash import html
 import dash_bootstrap_components as dbc
 
 from faas_profiler.config import config
-from faas_profiler.models import Profile
+from faas_profiler_core.models import Profile
 
 
 def profile_card(profile: Type[Profile]) -> dbc.Card:

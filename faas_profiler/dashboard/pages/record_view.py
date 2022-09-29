@@ -7,7 +7,8 @@ from faas_profiler.utilis import print_ms
 
 from faas_profiler_core.models import Trace, TraceRecord, FunctionContext
 from faas_profiler.dashboard.analyzers.base import Analyzer
-from faas_profiler.dashboard.analyzers import *
+from faas_profiler.dashboard.analyzers import * # noqa
+
 
 def function_context_card(
     function_context: FunctionContext
@@ -22,12 +23,12 @@ def function_context_card(
 
     _timing_row = []
     if function_context.total_execution_time and function_context.handler_execution_time:
-        _timing_row.append(
-            dbc.Col([html.B("Total Execution Time"), html.P(print_ms(function_context.total_execution_time))]))
-        _timing_row.append(
-            dbc.Col([html.B("Handler Execution Time"), html.P(print_ms(function_context.handler_execution_time))]))
-        _timing_row.append(
-            dbc.Col([html.B("Profiler Execution Time"), html.P(print_ms(function_context.profiler_time))]))
+        _timing_row.append(dbc.Col([html.B("Total Execution Time"), html.P(
+            print_ms(function_context.total_execution_time))]))
+        _timing_row.append(dbc.Col([html.B("Handler Execution Time"), html.P(
+            print_ms(function_context.handler_execution_time))]))
+        _timing_row.append(dbc.Col([html.B("Profiler Execution Time"), html.P(
+            print_ms(function_context.profiler_time))]))
 
     # _arguments = None
     # if function_context.arguments:
@@ -35,7 +36,8 @@ def function_context_card(
 
     _response = None
     if function_context.response:
-        _response = html.Div([html.B("Response"), html.Code(str(function_context.response))])
+        _response = html.Div([html.B("Response"),
+                              html.Code(str(function_context.response))])
 
     return dbc.Card(
         dbc.CardBody(
@@ -55,33 +57,34 @@ def make_analyzer_cards(data: Dict[str, Any]) -> List[dbc.Card]:
         header: str,
         content: str
     ) -> dbc.Card:
-        return  dbc.Card([
+        return dbc.Card([
             dbc.CardBody([
                 html.H5(header),
                 html.Div(content)
             ])
         ], style={"margin-top": "20px"})
-    
 
     _analyser_cards: List[dbc.Card] = []
     for analyzer_cls in Analyzer.__subclasses__():
         _requested_data = analyzer_cls.requested_data
         _name = analyzer_cls.safe_name()
-        if not _requested_data in data:
-            _analyser_cards.append(_analyzer_card(
-                header=_name,
-                content=f"There is no data for {_requested_data} for this profile"))
+        if _requested_data not in data:
+            _analyser_cards.append(
+                _analyzer_card(
+                    header=_name,
+                    content=f"There is no data for {_requested_data} for this profile"))
             continue
 
-        analyzer = analyzer_cls()    
+        analyzer = analyzer_cls()
         try:
             _analyser_cards.append(_analyzer_card(
                 header=_name,
                 content=analyzer.analyze_record(data[_requested_data])))
         except NotImplementedError:
             pass
-        
+
     return _analyser_cards
+
 
 def record_view(
     trace: Type[Trace],
@@ -92,9 +95,7 @@ def record_view(
     if record.function_context:
         _contents.append(function_context_card(record.function_context))
 
-    print(record.data.keys())
     if record.data:
         _contents = _contents + make_analyzer_cards(record.data)
 
     return html.Div(_contents)
-
