@@ -5,6 +5,8 @@ FaaS-Profile package
 """
 from __future__ import annotations
 
+import warnings
+
 import os
 import yaml
 import faas_profiler.cli as cli
@@ -28,6 +30,8 @@ from faas_profiler.templating import (
     ProfilerConfigTemplate,
     TemplatingError
 )
+
+warnings.simplefilter("ignore")
 
 
 class CommandError(RuntimeError):
