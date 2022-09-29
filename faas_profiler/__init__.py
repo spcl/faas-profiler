@@ -378,7 +378,7 @@ class Application:
         if function_name and function_name in self.functions:
             command += f" --function {function_name}"
 
-        cli.out(f"Deploying application with serverless...")
+        cli.out("Deploying application with serverless...")
         cli.run_command(command, cwd=self.path)
 
     def invoke(self, provider: Provider, function_name: str) -> None:

@@ -6,10 +6,8 @@ FaaS-Profiler Post processing
 import networkx as nx
 
 import logging
-from typing import Dict, List, Set, Tuple, Type
-from uuid import UUID, uuid4
-from tqdm import tqdm
-
+from typing import Dict, Set, Tuple, Type
+from uuid import UUID
 
 from faas_profiler_core.models import (
     TracingContext,
@@ -20,7 +18,7 @@ from faas_profiler_core.models import (
 )
 
 from faas_profiler.config import config
-from faas_profiler.models import Trace, Profile
+from faas_profiler_core.models import Trace, Profile
 
 
 class TraceCache:
@@ -35,8 +33,8 @@ class TraceCache:
         self._trace_graph: Dict[UUID, Type[nx.DiGraph]] = {}
 
     def get_trace(self,
-        trace_id: UUID
-    ) -> Tuple[Type[Trace], Type[nx.DiGraph]]:
+                  trace_id: UUID
+                  ) -> Tuple[Type[Trace], Type[nx.DiGraph]]:
         """
         Get cached trace by ID (if available)
         """
@@ -84,7 +82,6 @@ class TraceCache:
         if trace_id in self._unique_trace_ids:
             self._unique_trace_ids.remove(trace_id)
 
-
     def create_or_return_trace(
         self,
         trace_id: UUID
@@ -114,7 +111,6 @@ class RequestContextCache:
         self._outbound_requests: Dict[
             str, Tuple[TracingContext, OutboundContext]] = {}
 
-
     def find_outbound_request_by_inbound_identifier(
         self,
         inbound_identifier: str
@@ -133,7 +129,6 @@ class RequestContextCache:
         """
         return self._inbound_requests.get(outbound_identifier)
 
-
     def cache_outbound_request(
         self,
         outbound_context: Type[OutboundContext],
@@ -144,9 +139,11 @@ class RequestContextCache:
         """
         identifier_str = outbound_context.identifier_string
         if identifier_str in self._outbound_requests:
-            raise RuntimeError(f"Identifier duplicate for {identifier_str} in outbounds")
+            raise RuntimeError(
+                f"Identifier duplicate for {identifier_str} in outbounds")
 
-        self._outbound_requests[identifier_str] = (tracing_context, outbound_context)
+        self._outbound_requests[identifier_str] = (
+            tracing_context, outbound_context)
 
     def cache_inbound_request(
         self,
@@ -158,17 +155,20 @@ class RequestContextCache:
         """
         identifier_str = inbound_context.identifier_string
         if identifier_str in self._inbound_requests:
-            raise RuntimeError(f"Identifier duplicate for {identifier_str} in inbounds")
+            raise RuntimeError(
+                f"Identifier duplicate for {identifier_str} in inbounds")
 
-        self._inbound_requests[identifier_str] = (tracing_context, inbound_context)
+        self._inbound_requests[identifier_str] = (
+            tracing_context, inbound_context)
 
 
 logger = logging.getLogger(__file__)
 logger.setLevel(logging.INFO)
 
+
 def process_records() -> None:
     """
-    
+
     """
     trace_cache = TraceCache()
     request_cache = RequestContextCache()
@@ -183,6 +183,7 @@ def process_records() -> None:
 
     breakpoint()
 
+
 def process_record(
     record: Type[TraceRecord],
     trace_cache: Type[TraceCache],
@@ -192,7 +193,6 @@ def process_record(
     Process a single unprocessed record
     """
     trace_ctx = record.tracing_context
-    func_ctx = record.function_context
     in_ctx = record.inbound_context
 
     if trace_ctx is None:
@@ -206,13 +206,19 @@ def process_record(
     trace, graph = trace_cache.create_or_return_trace(
         trace_id=trace_ctx.trace_id)
     add_record_to_trace(trace, record)
-    
-    if in_ctx and in_ctx.resolvable:
-        resolve_inbound_context(record, trace, trace_cache, request_cache, graph)
 
+    if in_ctx and in_ctx.resolvable:
+        resolve_inbound_context(
+            record,
+            trace,
+            trace_cache,
+            request_cache,
+            graph)
 
     if record.outbound_contexts:
-        resolve_outbound_contexts(record, trace, trace_cache, request_cache, graph)
+        resolve_outbound_contexts(
+            record, trace, trace_cache, request_cache, graph)
+
 
 def resolve_inbound_context(
     record: Type[TraceRecord],
@@ -222,10 +228,10 @@ def resolve_inbound_context(
     graph
 ) -> None:
     """
-    
+
     """
     if not record.inbound_context or not record.tracing_context:
-        return 
+        return
 
     identifier_str = record.inbound_context.identifier_string
     outbound_request = request_cache.find_outbound_request_by_inbound_identifier(
@@ -253,15 +259,15 @@ def resolve_inbound_context(
                 f"Cannot find parent trace for parent trace ID {parent_trace_ctx.trace_id}")
             logger.info("Store Inbound request for later resolving.")
 
-            request_cache.cache_inbound_request(record.inbound_context, record.tracing_context)
+            request_cache.cache_inbound_request(
+                record.inbound_context, record.tracing_context)
     else:
         logger.info(
             f"Cannot find Outbound request for Inbound identifier {identifier_str}")
         logger.info("Store Inbound request for later resolving.")
 
-        request_cache.cache_inbound_request(record.inbound_context, record.tracing_context)
-
-
+        request_cache.cache_inbound_request(
+            record.inbound_context, record.tracing_context)
 
 
 def resolve_outbound_contexts(
@@ -272,7 +278,7 @@ def resolve_outbound_contexts(
     graph
 ) -> None:
     """
-    
+
     """
     if not record.outbound_contexts or len(record.outbound_contexts) == 0:
         return
@@ -295,8 +301,8 @@ def resolve_outbound_contexts(
                 child_in_ctx.trigger_finished_at = out_ctx.finished_at
 
                 merge_traces(record_trace, child_trace,
-                    parent_id=record.tracing_context.record_id,
-                    root_child_record_id=child_context.record_id)
+                             parent_id=record.tracing_context.record_id,
+                             root_child_record_id=child_context.record_id)
 
                 trace_cache.cache_trace(
                     record_trace, graph, override_trace_id=child_trace.trace_id)
@@ -316,7 +322,7 @@ def resolve_outbound_contexts(
                 "Store Outbound request for later resolving.")
 
             request_cache.cache_outbound_request(
-                    out_ctx, record.tracing_context)
+                out_ctx, record.tracing_context)
 
 
 # class RecordProcessor:
@@ -344,7 +350,8 @@ def resolve_outbound_contexts(
 #         """
 #         self.logger.info("Start building traces.")
 #         self.logger.info(
-#             f"Found {len(config.storage.unprocessed_record_keys)} unprocessed records \n")
+# f"Found {len(config.storage.unprocessed_record_keys)} unprocessed
+# records \n")
 
 #         for record in tqdm(
 #             config.storage.unprocessed_records(), total=len(
@@ -456,7 +463,8 @@ def resolve_outbound_contexts(
 #             parent_trace = self.trace_cache.get_trace(parent_context.trace_id)
 #             if parent_trace:
 #                 self.logger.info(
-#                     f"Found Parent trace {parent_trace.trace_id} for parent tracing context {parent_context.trace_id}")
+# f"Found Parent trace {parent_trace.trace_id} for parent tracing context
+# {parent_context.trace_id}")
 
 #                 merge_traces(parent_trace, child_trace)
 #                 record.tracing_context.parent_id = parent_context.record_id
@@ -503,7 +511,8 @@ def resolve_outbound_contexts(
 #                     child_context.trace_id)
 #                 if child_trace:
 #                     self.logger.info(
-#                         f"Found Child trace {child_context.trace_id} for child tracing context {child_context.trace_id}")
+# f"Found Child trace {child_context.trace_id} for child tracing context
+# {child_context.trace_id}")
 
 #                     child_in_ctx.trigger_finished_at = out_ctx.finished_at
 
@@ -534,6 +543,7 @@ def resolve_outbound_contexts(
 Helpers
 """
 
+
 def add_record_to_trace(trace: Type[Trace], record: Type[TraceRecord]):
     """
     Adds record to trace.
@@ -544,6 +554,7 @@ def add_record_to_trace(trace: Type[Trace], record: Type[TraceRecord]):
     trace.records.append(record)
 
     assert record.tracing_context.trace_id == trace.trace_id
+
 
 def merge_traces(
     parent_trace: Type[Trace],
@@ -606,6 +617,7 @@ def get_trace_root_record(trace: Type[Trace]) -> Type[TraceRecord]:
         return root_records[0]
     except IndexError:
         return None
+
 
 def get_trace_root_function(trace: Type[Trace]) -> Type[FunctionContext]:
     """
