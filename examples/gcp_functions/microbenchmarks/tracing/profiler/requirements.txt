@@ -1,0 +1,4 @@
+faas_profiler_python @ git+https://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@github.com/spcl/faas-profiler-python
+google-cloud-pubsub
+google-cloud-tasks
+google-cloud-storage

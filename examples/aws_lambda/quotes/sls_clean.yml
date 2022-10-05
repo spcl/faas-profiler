@@ -1,0 +1,115 @@
+service: quotes-clean
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.8
+  stage: dev
+  region: eu-central-1
+  memorySize: 1024
+  timeout: 20
+  environment:
+    DYNAMODB_TABLE: ${self:service}-${opt:stage, self:provider.stage}-quotes
+    SNS_SCRAP_TOPIC: ${self:service}-${opt:stage, self:provider.stage}-scrap
+    SQS_QUOTES: ${self:service}-${opt:stage, self:provider.stage}-quotes
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+        - dynamodb:BatchWriteItem
+      Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE}"
+    - Effect: Allow
+      Action:
+        - sns:Publish
+        - sns:Subscribe
+      Resource: { "Fn::Join" : ["", ["arn:aws:sns:${self:provider.region}:", { "Ref" : "AWS::AccountId" }, ":${self:provider.environment.SNS_SCRAP_TOPIC}" ] ]  }
+    - Effect: Allow
+      Action:
+        - sqs:SendMessage
+        - sqs:DeleteMessage
+        - sqs:ReceiveMessage
+        - sqs:GetQueueUrl
+        - sqs:ListQueues
+      Resource: { "Fn::Join" : ["", ["arn:aws:sqs:${self:provider.region}:", { "Ref" : "AWS::AccountId" }, ":${self:provider.environment.SQS_QUOTES}" ] ]  }
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+      Resource: arn:aws:s3:::faas-profiler-records/*
+
+package:
+  patterns:
+  - '!**'
+  - '!**/**'
+  - clean/main.py
+
+functions:
+  dispatch_scrappers:
+    handler: clean/main.dispatch_scrappers
+    environment:
+      SNS_SCRAP_ARN: { "Fn::Join" : ["", ["arn:aws:sns:${self:provider.region}:", { "Ref" : "AWS::AccountId" }, ":${self:provider.environment.SNS_SCRAP_TOPIC}" ] ] }
+
+  scrap_quotes:
+    handler: clean/main.scrap_quotes
+    environment:
+      SQS_URL: { "Fn::Join" : ["", ["https://sqs.${self:provider.region}.amazonaws.com/", { "Ref" : "AWS::AccountId" }, "/${self:provider.environment.SQS_QUOTES}" ] ]  }
+      QUOTES_API: api.quotable.io
+    events:
+    - sns:
+        arn: !Ref scrapSNSTopic
+        topicName: ${self:provider.environment.SNS_SCRAP_TOPIC}
+
+  save_quotes:
+    handler: clean/main.save_quotes
+    events:
+    - sqs:
+        arn:
+          Fn::GetAtt:
+            - quotesQueue
+            - Arn
+        batchSize: 10
+
+resources:
+  Resources:
+    scrapSNSTopic:
+      Type: AWS::SNS::Topic
+      Properties: 
+        DisplayName: ${self:provider.environment.SNS_SCRAP_TOPIC}
+        TopicName: ${self:provider.environment.SNS_SCRAP_TOPIC}
+    quotesQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        MessageRetentionPeriod: 345600
+        QueueName: ${self:provider.environment.SQS_QUOTES}
+        ReceiveMessageWaitTimeSeconds: 1
+        VisibilityTimeout: 300
+    quotesDynamoDbTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: author
+            AttributeType: S
+          - AttributeName: quoteId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: author
+            KeyType: HASH
+          - AttributeName: quoteId
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.DYNAMODB_TABLE}
+
+custom:
+  pythonRequirements:
+    pythonBin: python3
+    
+
+plugins:
+  - serverless-python-requirements

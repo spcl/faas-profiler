@@ -1,0 +1,43 @@
+service: quotes
+
+frameworkVersion: '3'
+
+provider:
+  name: google
+  stage: dev
+  runtime: python37
+  region: europe-west3
+  project: faas-355111
+  credentials: ~/.gcloud/keyfile.json
+
+  environment:
+    PUBSUB_SCARP_TOPIC: 'projects/${self:provider.project, ""}/topics/${self:service}-${opt:stage, self:provider.stage}-scrap'
+
+plugins:
+  - serverless-google-cloudfunctions
+
+
+package:
+  patterns:
+  - '!**'
+  - '!**/**'
+  - main.py
+  - requirements.txt
+
+functions:
+  dispatch_scrappers:
+    handler: dispatch_scrappers
+    events:
+      - http: path
+  scrap_quotes:
+    handler: scrap_quotes
+    events:
+     - event:
+         eventType: providers/cloud.pubsub/eventTypes/topic.publish
+         resource: ${self:provider.environment.PUBSUB_SCARP_TOPIC}
+
+  save_quotes:
+    handler: save_quotes
+    events:
+      - http: save
+

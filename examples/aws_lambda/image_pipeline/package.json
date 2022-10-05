@@ -1,0 +1,6 @@
+{
+  "devDependencies": {
+    "serverless-plugin-existing-s3": "^2.4.0",
+    "serverless-python-requirements": "^5.4.0"
+  }
+}

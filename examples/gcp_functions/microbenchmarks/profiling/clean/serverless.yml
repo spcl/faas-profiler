@@ -1,0 +1,33 @@
+service: benchmarks-profiling-clean
+
+provider:
+  name: google
+  stage: dev
+  memorySize: 1024
+  timeout: 10s
+  runtime: python38
+  region: europe-west3
+  project: faas-355111
+  credentials: ~/.gcloud/keyfile.json
+
+frameworkVersion: '3'
+plugins:
+  - serverless-google-cloudfunctions
+
+package:
+  patterns:
+  - '!**'
+  - '!**/**'
+  - main.py
+  - requirements.txt
+
+functions:
+  connection:
+    handler: connection
+    events:
+      - http: path
+
+  potential_field:
+    handler: potential_field
+    events:
+      - http: path

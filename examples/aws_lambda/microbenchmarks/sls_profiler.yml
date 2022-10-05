@@ -1,0 +1,132 @@
+service: microbenchmarks-profiler
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.8
+  stage: dev
+  region: eu-central-1
+  memorySize: 1024
+  timeout: 10
+  layers:
+    - arn:aws:lambda:eu-central-1:324305201550:layer:faas_profiler_python:71
+  iam:
+    role:
+      statements:
+      - Effect: Allow
+        Action:
+          - s3:PutObject
+        Resource: arn:aws:s3:::faas-profiler-records/*
+      - Effect: Allow
+        Action:
+          - s3:PutObject
+        Resource: arn:aws:s3:::${self:custom.s3_bucket_name}/*
+      - Effect: Allow
+        Action:
+          - sns:Publish
+        Resource: { "Fn::Join" : ["", ["arn:aws:sns:${self:provider.region}:", { "Ref" : "AWS::AccountId" }, ":${self:custom.sns_topic_name}" ] ] }
+      - Effect: Allow
+        Action:
+          - sqs:SendMessage
+          - sqs:DeleteMessage
+          - sqs:ReceiveMessage
+          - sqs:GetQueueUrl
+          - sqs:ListQueues
+        Resource: { "Fn::Join" : ["", ["arn:aws:sqs:${self:provider.region}:", { "Ref" : "AWS::AccountId" }, ":${self:custom.sqs_queue_name}" ] ]  }
+      - Effect: Allow
+        Action:
+          - s3:GetObject
+          - s3:ListBucket
+        Resource:
+          - arn:aws:s3:::${self:custom.photoCollectionBucket}
+          - arn:aws:s3:::${self:custom.photoCollectionBucket}/*
+
+package:
+  individually: true
+  patterns:
+  - '!**'
+  - '!**/**'
+
+functions:
+  empty:
+    handler: profiler/empty.handler
+    package:
+      patterns:
+        - profiler/empty.py
+
+  sns:
+    handler: profiler/sns.handler
+    package:
+      patterns:
+        - profiler/sns.py
+    environment:
+      SNS_ARN: { "Fn::Join" : ["", ["arn:aws:sns:${self:provider.region}:", { "Ref" : "AWS::AccountId" }, ":${self:custom.sns_topic_name}" ] ] }
+
+  sqs:
+    handler: profiler/sqs.handler
+    package:
+      patterns:
+        - profiler/sqs.py
+    environment:
+      SQS_URL: { "Fn::Join" : ["", ["https://sqs.${self:provider.region}.amazonaws.com/", { "Ref" : "AWS::AccountId" }, "/${self:custom.sqs_queue_name}" ] ] }
+
+  s3:
+    handler: profiler/s3.handler
+    package:
+      patterns:
+        - profiler/s3.py
+    environment:
+      S3_BUCKET: ${self:custom.s3_bucket_name}
+
+  potential_field:
+    handler: profiler/potential_field.handler
+    package:
+      patterns:
+        - profiler/potential_field.py
+    layers:
+      - arn:aws:lambda:eu-central-1:324305201550:layer:numpy:1
+      - arn:aws:lambda:eu-central-1:324305201550:layer:faas_profiler_python:71
+  
+  connection:
+    handler: profiler/connection.handler
+    package:
+      patterns:
+        - profiler/connection.py
+
+  s3_to_efs:
+    handler: profiler/s3_to_efs.handler
+    package:
+      patterns:
+        - profiler/s3_to_efs.py
+    fileSystemConfig:
+      localMountPath: ${self:custom.efsMount}
+      arn: arn:aws:elasticfilesystem:eu-central-1:324305201550:access-point/fsap-0c23ea5fb01395dc6
+    vpc:
+      securityGroupIds:
+        - sg-0a5eb585d260d2584
+      subnetIds:
+        - subnet-0d35b9ee97f645844
+
+resources:
+  Resources:
+    benchmarkSNSTopic:
+      Type: AWS::SNS::Topic
+      Properties: 
+        DisplayName: ${self:custom.sns_topic_name}
+        TopicName: ${self:custom.sns_topic_name}
+    benchmarkQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:custom.sqs_queue_name}
+    benchmarkBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.s3_bucket_name}
+
+custom:
+  sns_topic_name: ${self:service}-${opt:stage, self:provider.stage}-topic
+  sqs_queue_name: ${self:service}-${opt:stage, self:provider.stage}-queue
+  s3_bucket_name: ${self:service}-${opt:stage, self:provider.stage}-bucket
+  photoCollectionBucket: sample-photo-collection
+  efsMount: /mnt/lambda

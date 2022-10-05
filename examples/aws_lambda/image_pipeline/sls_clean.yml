@@ -1,0 +1,89 @@
+service: image-pipeline-clean
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.8
+  region: eu-central-1
+  architecture: x86_64
+  memorySize: 1024
+  timeout: 10
+  stage: dev
+  iam:
+    role:
+      statements:
+      - Effect: Allow
+        Action:
+          - s3:PutObject
+          - s3:GetObject
+        Resource: arn:aws:s3:::${self:custom.thumbnail_image_bucket}/*
+      - Effect: Allow
+        Action:
+          - s3:GetObject
+          - s3:ListBucket
+        Resource:
+          - arn:aws:s3:::${self:custom.photoCollectionBucket}
+          - arn:aws:s3:::${self:custom.photoCollectionBucket}/*
+      - Effect: Allow
+        Action:
+          - s3:PutObject
+        Resource: arn:aws:s3:::faas-profiler-records/*
+      - Effect: Allow
+        Action:
+          - lambda:InvokeFunction
+          - lambda:InvokeAsync
+        Resource: "*"
+  layers:
+    - arn:aws:lambda:eu-central-1:324305201550:layer:pillow:1
+  environment:
+    PHOTO_COLLECTION_BUCKET: ${self:custom.photoCollectionBucket}
+    THUMBNAIL_BUCKET: ${self:custom.thumbnail_image_bucket}
+    EFS_MOUNT: ${self:custom.efsMount}
+    PROCESS_FUNCTION: ${self:service}-${self:provider.stage}-process_image
+    THUMBNAIL_FUNCTION: ${self:service}-${self:provider.stage}-thumbnail_image
+
+package:
+  patterns:
+  - '!**'
+  - '!**/**'
+  - clean.py
+
+functions:
+  distribute_work:
+    handler: clean.distribute_work
+    events:
+     - httpApi:
+         path: /
+         method: get
+
+  process_image:
+    handler: clean.process_image
+
+  thumbnail_image:
+    handler: clean.thumbnail_image
+
+  save_image:
+    handler: clean.save_image
+    fileSystemConfig:
+      localMountPath: ${self:custom.efsMount}
+      arn: arn:aws:elasticfilesystem:eu-central-1:324305201550:access-point/fsap-0c23ea5fb01395dc6
+    vpc:
+      securityGroupIds:
+        - sg-0a5eb585d260d2584
+      subnetIds:
+        - subnet-0d35b9ee97f645844
+    events:
+    - s3:
+        bucket: ${self:custom.thumbnail_image_bucket}
+        event: s3:ObjectCreated:*
+        rules:
+          - suffix: .jpg
+
+custom:
+  thumbnail_image_bucket: ${self:service}-${self:provider.stage}-images-thumbnails
+  photoCollectionBucket: sample-photo-collection
+  efsMount: /mnt/lambda
+
+plugins:
+  - serverless-plugin-existing-s3
+  - serverless-python-requirements

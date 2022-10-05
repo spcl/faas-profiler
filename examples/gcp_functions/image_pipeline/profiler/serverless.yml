@@ -1,0 +1,54 @@
+service: image-pipeline
+
+frameworkVersion: '3'
+
+provider:
+  name: google
+  stage: dev
+  runtime: python37
+  region: europe-west3
+  project: faas-355111
+  credentials: ~/.gcloud/keyfile.json
+
+  environment:
+    PHOTO_COLLECTION_BUCKET: ${self:custom.photoCollectionBucket}
+    THUMBNAIL_BUCKET: ${self:service}-${self:provider.stage}-thumbnails
+
+    QUEUE_URL: 'projects/${self:provider.project}/locations/${self:provider.region}/queues/${self:service}-${self:provider.stage}-queue'
+
+    SERVICE_ACCOUNT: '${self:provider.project}@appspot.gserviceaccount.com'
+    PROCESS_FUNC_URL: 'https://${self:provider.region}-${self:provider.project}.cloudfunctions.net/${self:service}-${self:provider.stage}-process_image'
+    THUMBNAIL_FUNC_URL: 'https://${self:provider.region}-${self:provider.project}.cloudfunctions.net/${self:service}-${self:provider.stage}-thumbnail_image'
+
+plugins:
+  - serverless-google-cloudfunctions
+
+
+package:
+  patterns:
+  - '!**'
+  - '!**/**'
+  - main.py
+  - requirements.txt
+
+functions:
+  distribute_work:
+    handler: distribute_work
+    events:
+      - http: path
+
+  process_image:
+    handler: process_image
+    events:
+      - http: process
+
+  thumbnail_image:
+    handler: thumbnail_image
+    events:
+      - http: thumbnail
+
+
+custom:
+  thumbnail_image_bucket: ${self:service}-${self:provider.stage}-images-thumbnails
+  photoCollectionBucket: sample-photo-collection
+

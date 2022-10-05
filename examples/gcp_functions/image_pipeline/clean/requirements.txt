@@ -1,0 +1,3 @@
+pillow
+google-cloud-tasks
+google-cloud-storage

@@ -1,0 +1,160 @@
+service: matrix-multiplication-profiler
+
+provider:
+  name: aws
+  runtime: python3.8
+  stage: dev
+  region: eu-central-1
+  timeout: 100
+  memorySize: 1024
+  environment:
+    MATRIX_BUCKET_NAME: ${self:custom.matrix_bucket_name}
+    MATRIX_BUCKET_REGION: ${self:provider.region}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - s3:*
+      Resource: "*"
+  layers:
+    - arn:aws:lambda:eu-central-1:324305201550:layer:faas_profiler_python:71
+
+package:
+  patterns:
+  - '!**'
+  - '!**/**'
+  - profiler.py
+
+functions:
+  make_matrix:
+    handler: profiler.make_matrix
+  schedule_work:
+    handler: profiler.schedule_work
+  multiply_parallel:
+    handler: profiler.multiply_parallel
+  combine_results:
+    handler: profiler.combine_results
+
+custom:
+  matrix_bucket_name: ${self:service}-${self:provider.stage}-data
+
+resources:
+  Resources:
+    MatrixMultiplicationBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.matrix_bucket_name}
+
+stepFunctions:
+  stateMachines:
+    matrix_multiplication_step_function:
+      name: MatrixMultiplicationProfiler
+      type: EXPRESS
+      events:
+        - http:
+            path: start
+            method: GET
+      definition:
+        StartAt: MakeMatrix
+        States:
+          MakeMatrix:
+            Type: Task
+            Resource: "arn:aws:lambda:${aws:region}:${aws:accountId}:function:${self:service}-${self:provider.stage}-make_matrix"
+            TimeoutSeconds: 60
+            Next: AppendWorkerCount
+          AppendWorkerCount:
+            Type: Pass
+            InputPath: $
+            OutputPath: $
+            ResultPath: $.workerCount
+            Result: '5'
+            Next: ScheduleWork
+          ScheduleWork:
+            Type: Task
+            Resource: "arn:aws:lambda:${aws:region}:${aws:accountId}:function:${self:service}-${self:provider.stage}-schedule_work"
+            TimeoutSeconds: 60
+            Next: ParallelMultiplication
+          ParallelMultiplication:
+            Type: Parallel
+            Branches:
+              - StartAt: AssignWorkerID0
+                States:
+                  AssignWorkerID0:
+                    Type: Pass
+                    InputPath: $
+                    OutputPath: $
+                    ResultPath: $.workerID
+                    Result: '0'
+                    Next: Worker0
+                  Worker0:
+                    Type: Task
+                    Resource: "arn:aws:lambda:${aws:region}:${aws:accountId}:function:${self:service}-${self:provider.stage}-multiply_parallel"
+                    TimeoutSeconds: 600
+                    End: true
+              - StartAt: AssignWorkerID1
+                States:
+                  AssignWorkerID1:
+                    Type: Pass
+                    InputPath: $
+                    OutputPath: $
+                    ResultPath: $.workerID
+                    Result: '1'
+                    Next: Worker1
+                  Worker1:
+                    Type: Task
+                    Resource: "arn:aws:lambda:${aws:region}:${aws:accountId}:function:${self:service}-${self:provider.stage}-multiply_parallel"
+                    TimeoutSeconds: 600
+                    End: true
+              - StartAt: AssignWorkerID2
+                States:
+                  AssignWorkerID2:
+                    Type: Pass
+                    InputPath: $
+                    OutputPath: $
+                    ResultPath: $.workerID
+                    Result: '2'
+                    Next: Worker2
+                  Worker2:
+                    Type: Task
+                    Resource: "arn:aws:lambda:${aws:region}:${aws:accountId}:function:${self:service}-${self:provider.stage}-multiply_parallel"
+                    TimeoutSeconds: 600
+                    End: true
+              - StartAt: AssignWorkerID3
+                States:
+                  AssignWorkerID3:
+                    Type: Pass
+                    InputPath: $
+                    OutputPath: $
+                    ResultPath: $.workerID
+                    Result: '3'
+                    Next: Worker3
+                  Worker3:
+                    Type: Task
+                    Resource: "arn:aws:lambda:${aws:region}:${aws:accountId}:function:${self:service}-${self:provider.stage}-multiply_parallel"
+                    TimeoutSeconds: 600
+                    End: true
+              - StartAt: AssignWorkerID4
+                States:
+                  AssignWorkerID4:
+                    Type: Pass
+                    InputPath: $
+                    OutputPath: $
+                    ResultPath: $.workerID
+                    Result: '4'
+                    Next: Worker4
+                  Worker4:
+                    Type: Task
+                    Resource: "arn:aws:lambda:${aws:region}:${aws:accountId}:function:${self:service}-${self:provider.stage}-multiply_parallel"
+                    TimeoutSeconds: 600
+                    End: true
+            InputPath: $
+            OutputPath: $
+            ResultPath: $.Result
+            Next: CombineResults
+          CombineResults:
+            Type: Task
+            Resource: "arn:aws:lambda:${aws:region}:${aws:accountId}:function:${self:service}-${self:provider.stage}-combine_results"
+            TimeoutSeconds: 60
+            End: true
+          
+plugins:
+  - serverless-step-functions

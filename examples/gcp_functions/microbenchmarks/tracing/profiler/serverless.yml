@@ -1,0 +1,39 @@
+service: benchmarks-tracing-profiler
+
+provider:
+  name: google
+  stage: dev
+  memorySize: 1024
+  timeout: 10s
+  runtime: python38
+  region: europe-west3
+  project: faas-355111
+  credentials: ~/.gcloud/keyfile.json
+
+frameworkVersion: '3'
+plugins:
+  - serverless-google-cloudfunctions
+
+package:
+  patterns:
+  - '!**'
+  - '!**/**'
+  - main.py
+  - requirements.txt
+
+functions:
+  cloud_storage:
+    handler: cloud_storage
+    events:
+      - http: path
+
+  pub_sub:
+    handler: pub_sub
+    events:
+      - http: path
+
+  cloud_tasks:
+    handler: cloud_tasks
+    events:
+      - http: path
+  
