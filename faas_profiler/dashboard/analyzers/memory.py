@@ -199,25 +199,12 @@ class MemoryUsageAnalyzer(Analyzer):
 
 
 class LineMemoryAnalyzer(Analyzer):
+    requested_data = "memory::LineUsage"
+    name = "Memory Line Usage"
 
-    def __init__(self, record_data: Type[RecordData]):
-        self.record_data = record_data
-        self.record_name = record_data.name
-        self.results = MemoryLineUsage.load(self.record_data.results)
-
-        super().__init__()
-
-    def name(self) -> str:
-        """
-        Returns the name for the line analyzer
-        """
-        return "Line Memory Analyzer"
-
-    def render(self):
-        """
-        Returns a table for all recorded lines.
-        """
-        line_memories = self.results.line_memories
+    def analyze_record(self, record_data: Type[RecordData]):
+        result = MemoryLineUsage.load(record_data.results)
+        line_memories = result.line_memories
         if len(line_memories) == 0:
             return html.P("No memory lines recorded.")
 
