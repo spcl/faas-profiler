@@ -183,33 +183,3 @@ class CPUCoreUsageAnalyzer(Analyzer):
         return html.Div([
             dcc.Graph(figure=fig)
         ])
-
-# class ProfileCPUUsageAnalyzer(Analyzer):
-
-#     def __init__(self, profile_access: Type[ProfileAccess]):
-#         self.profile_access = profile_access
-#         self.all_cpu_data = self.profile_access.get_all_record_data(
-#             "cpu::Usage")
-#         super().__init__()
-
-#     def name(self) -> str:
-#         return "Profile CPU Usage"
-
-#     def render(self):
-#         fig = go.Figure()
-#         for trace, trace_data in self.all_cpu_data.items():
-#             fig.add_trace(go.Bar(
-#                 x=list(trace_data.keys()),
-#                 y=[np.average(f["measuring_points"]) for f in trace_data.values()],
-#                 name=str(trace),
-#                 xaxis=None
-#             ))
-
-#         fig.update_layout(
-#             barmode='group',
-#             xaxis_visible=False,
-#             xaxis_showticklabels=False)
-
-#         return html.Div([
-#             dcc.Graph(figure=fig)
-#         ])

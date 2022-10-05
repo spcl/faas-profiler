@@ -60,11 +60,11 @@ class NetworkIOAnalyzer(Analyzer):
             df,
             x="Trace ID",
             y=["Average Bytes Sent", "Average Bytes Received"],
-            title=f"Memory-Usage ({bytes_unit})")
+            title=f"Bytes Sent/Received in {bytes_unit}")
 
         fig.update_layout(
             xaxis_title="Traces",
-            yaxis_title=f"Memory-Usage in {bytes_unit}",
+            yaxis_title=f"Bytes Sent/Received in {bytes_unit}",
             legend_title="Bytes Sent/Received",
         )
 
@@ -186,6 +186,9 @@ class NetworkConnectionAnalyzer(Analyzer):
             for record_data in trace_data.values():
                 record_result = NetworkConnections.load(record_data.results)
                 for conn in record_result.connections:
+                    if str(conn.remote_address).startswith("169.254"):
+                        continue
+
                     df = pd.concat([df, pd.DataFrame({
                         "Trace ID": str(trace_id)[:8],
                         "Remote Address": conn.remote_address,

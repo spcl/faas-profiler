@@ -21,6 +21,7 @@ from faas_profiler_core.models import Trace, Profile
 
 from faas_profiler.config import config
 from faas_profiler.dashboard.graphing import FUNCTION_NODE, SERVICE_NODE, EDGE_SIZE_LIMIT, NODE_SIZE_LIMIT
+from faas_profiler.utilis import print_ms, seconds_to_ms, time_delta_in_sec
 
 
 class GraphCache:
@@ -102,7 +103,9 @@ class GraphCache:
             return graph
 
     def state(self):
-
+        """
+        State for debugging
+        """
         print("ALL GRAPHES")
         for tid, graph in self._graphes_by_id.items():
             print(
@@ -224,7 +227,6 @@ def process_records() -> None:
 
         print(f"Saving graph {graph} for {trace.trace_id}")
 
-        ##
         graph_data = nx.cytoscape_data(graph)
 
         config.storage.store_graph_data(trace.trace_id, graph_data)
@@ -249,23 +251,6 @@ def process_records() -> None:
     print(f"Processing {len(profiles)} profiles")
     for profile in tqdm(profiles.values()):
         config.storage.store_profile(profile)
-
-    # for g in graph_cache.get_all_graphes():
-    #     pos = nx.planar_layout(g)
-
-    #     edge_labels = dict([((u,v,), "{:.2f}".format(d['latency'])) for u,v,d in g.edges(data=True)])
-
-    #     nx.draw(
-    #         g, pos, edge_color='black', width=1, linewidths=1,
-    #         node_size=500, node_color='pink', alpha=0.9,
-    #         labels={node[0]: node[1].get("label") for node in g.nodes(data=True)}
-    #     )
-    #     nx.draw_networkx_edge_labels(
-    #         g, pos,
-    #         edge_labels=edge_labels,
-    #         font_color='red'
-    #     )
-    #     plt.show()
 
 
 def process_record(
@@ -307,12 +292,14 @@ def process_record(
             "label": "N/A ms"
         }
 
-        # if str(trace_ctx.parent_id) in graph:
-        #     parent_node = graph.nodes[str(trace_ctx.parent_id)]
-        #     latency = seconds_to_ms(
-        #         time_delta_in_sec(func_ctx.invoked_at, parent_node["finished_at"]))
-        #     attr["latency"] = latency
-        #     attr["label"] = print_ms(latency)
+        if str(trace_ctx.parent_id) in graph:
+            parent_node = graph.nodes[str(trace_ctx.parent_id)]
+            latency = seconds_to_ms(
+                time_delta_in_sec(
+                    func_ctx.invoked_at,
+                    parent_node["finished_at"]))
+            attr["latency"] = latency
+            attr["label"] = print_ms(latency)
 
         graph.add_edge(str(trace_ctx.parent_id), str(record.record_id), **attr)
 

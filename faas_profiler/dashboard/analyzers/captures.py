@@ -93,7 +93,7 @@ class S3CaptureAnalyzer(Analyzer):
             x="Trace ID",
             y="Bandwidth",
             color="Mode",
-            title=f"S3 Bandwidth ({bytes_unit}it/sec)")
+            title=f"S3 API Access Bandwidth ({bytes_unit}it/sec)")
 
         return html.Div([
             dcc.Graph(figure=fig),

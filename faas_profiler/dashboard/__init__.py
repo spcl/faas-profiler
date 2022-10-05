@@ -4,8 +4,6 @@
 FaaS-Profiler Dashboard module
 """
 
-from faas_profiler.dashboard.pages.view import * # noqa
-from faas_profiler.dashboard.pages.index import * # noqa
 import dash
 import dash_bootstrap_components as dbc
 
@@ -18,6 +16,8 @@ app = dash.Dash(
     pages_folder="",
     prevent_initial_callbacks=True)
 
+from faas_profiler.dashboard.pages.view import * # noqa
+from faas_profiler.dashboard.pages.index import * # noqa
 
 app.layout = dash.html.Div([
     dbc.NavbarSimple(
