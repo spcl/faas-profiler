@@ -19,7 +19,7 @@ from faas_profiler_core.constants import Runtime, Provider
 
 from faas_profiler.config import config
 from faas_profiler.dashboard import app
-from faas_profiler.postprocessing_new import process_records
+from faas_profiler.postprocessing import process_records
 from faas_profiler.templating import (
     HandlerTemplate,
     GitIgnoreTemplate,

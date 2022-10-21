@@ -2,78 +2,79 @@
 """
 FaaS-Profiler Post processing
 """
-
 import networkx as nx
 
 import logging
-from typing import Dict, Set, Tuple, Type
-from uuid import UUID
+from typing import Dict, List, Set, Tuple, Type
+from uuid import UUID, uuid4
+from tqdm import tqdm
 
 from faas_profiler_core.models import (
     TracingContext,
     TraceRecord,
-    FunctionContext,
     InboundContext,
     OutboundContext
 )
-
-from faas_profiler.config import config
+from faas_profiler_core.constants import TriggerSynchronicity
 from faas_profiler_core.models import Trace, Profile
 
+from faas_profiler.config import config
+from faas_profiler.dashboard.graphing import FUNCTION_NODE, SERVICE_NODE, EDGE_SIZE_LIMIT, NODE_SIZE_LIMIT
+from faas_profiler.utilis import print_ms, seconds_to_ms, time_delta_in_sec
 
-class TraceCache:
+
+class GraphCache:
     """
     In-Memory trace cached used for record processing.
     """
 
     def __init__(self) -> None:
-        self._traces_by_id: Dict[UUID, Trace] = {}
+        self._graphes_by_id: Dict[UUID, Type[nx.Graph]] = {}
         self._unique_trace_ids: Set[UUID] = set()
 
-        self._trace_graph: Dict[UUID, Type[nx.DiGraph]] = {}
+    def get_graph(
+        self,
+        trace_id: UUID
+    ) -> Type[nx.DiGraph]:
+        """
+        Get cached graph by ID (if available)
+        """
+        graph = self._graphes_by_id.get(trace_id)
+        if not graph:
+            return
 
-    def get_trace(self,
-                  trace_id: UUID
-                  ) -> Tuple[Type[Trace], Type[nx.DiGraph]]:
-        """
-        Get cached trace by ID (if available)
-        """
-        graph = self._trace_graph.get(trace_id)
-        trace = self._traces_by_id.get(trace_id)
-        return trace, graph
+        _parent_id = graph.graph.get("parent_trace_id")
+        if _parent_id:
+            return self.get_graph(_parent_id)
 
-    def get_all_traces(self) -> Type[Trace]:
+        return graph
+
+    def get_all_graphes(self) -> Type[Trace]:
         """
-        Get all unique cached traces
+        Get all unique cached graphes
         """
         return [
-            self._traces_by_id[tid] for tid in self._unique_trace_ids]
+            self._graphes_by_id[tid] for tid in self._unique_trace_ids]
 
     @property
-    def number_of_traces(self) -> int:
+    def number_of_graphes(self) -> int:
         """
         Returns the number of unique traces.
         """
         return len(self._unique_trace_ids)
 
-    def cache_trace(
+    def cache_graph(
         self,
-        trace: Type[Trace],
-        graph: Type[nx.DiGraph],
-        override_trace_id: UUID = None
+        trace_id: UUID,
+        graph: Type[nx.DiGraph]
     ):
         """
-        Caches new trace.
-
-        If override trace ID is not None, this ID will be used for the mapping.
+        Caches new graph.
         """
-        trace_id = override_trace_id
-        if trace_id is None:
-            trace_id = trace.trace_id
+        graph.graph["trace_id"] = str(trace_id)
 
         self._unique_trace_ids.add(trace_id)
-        self._traces_by_id[trace_id] = trace
-        self._trace_graph[trace_id] = graph
+        self._graphes_by_id[trace_id] = graph
 
     def flush_trace(self, trace_id: UUID):
         """
@@ -82,25 +83,37 @@ class TraceCache:
         if trace_id in self._unique_trace_ids:
             self._unique_trace_ids.remove(trace_id)
 
-    def create_or_return_trace(
+    def create_or_return_graph(
         self,
         trace_id: UUID
-    ) -> Tuple[Type[Trace], Type[nx.DiGraph]]:
+    ) -> Type[nx.DiGraph]:
         """
-        Creates or returns a trace
+        Creates or returns a graph
         """
         logger.info(f"Search for trace with ID {trace_id}")
-        trace, graph = self.get_trace(trace_id)
-        if trace:
-            logger.info(f"Found trace with ID {trace_id}")
-            return trace, graph
+        graph = self.get_graph(str(trace_id))
+        if graph:
+            logger.info(f"Found graph with ID {trace_id}")
+            return graph
         else:
             logger.info(
-                f"Could not find trace for ID {trace_id}. Create new trace.")
-            graph = nx.DiGraph()
-            trace = Trace(trace_id=trace_id)
-            self.cache_trace(trace, graph)
-            return trace, graph
+                f"Could not find graph for ID {trace_id}. Create new graph.")
+            graph = nx.DiGraph(trace_id=trace_id)
+            self.cache_graph(str(trace_id), graph)
+            return graph
+
+    def state(self):
+        """
+        State for debugging
+        """
+        print("ALL GRAPHES")
+        for tid, graph in self._graphes_by_id.items():
+            print(
+                f"{tid}: GRAPH ID {graph.graph['trace_id']}, "
+                "PARENT: {graph.graph.get('parent_trace_id')} {str(graph)}, MEM {hex(id(graph))}")
+
+        print("\n UNI GRAPHES:")
+        print(self._unique_trace_ids)
 
 
 class RequestContextCache:
@@ -167,29 +180,84 @@ logger.setLevel(logging.INFO)
 
 
 def process_records() -> None:
-    trace_cache = TraceCache()
+    """
+    Processes a batch of unprocessed records.
+    """
+    graph_cache = GraphCache()
     request_cache = RequestContextCache()
 
-    print(f"Processing records for {config.provider.name}")
+    processed_records: Dict[UUID, Type[TraceRecord]] = {}
 
-    logger.info(
+    traces: List[Trace] = []
+    profiles: Dict[str, Profile] = {}
+
+    # Process Records
+    print(f"Processing records for {config.provider.name}")
+    print(
         f"Found {len(config.storage.unprocessed_record_keys)} unprocessed records \n")
 
-    for record in config.storage.unprocessed_records():
-        process_record(record, trace_cache, request_cache)
+    for record in tqdm(
+        config.storage.unprocessed_records(), total=len(
+            config.storage.unprocessed_record_keys)):
+        process_record(record, graph_cache, request_cache)
+        processed_records[record.record_id] = record
 
-    breakpoint()
+    assert len(config.storage.unprocessed_record_keys) == len(
+        processed_records)
+
+    # Process Traces
+    print(f"Processing {graph_cache.number_of_graphes} traces.")
+    for graph in tqdm(graph_cache.get_all_graphes()):
+        trace = Trace(graph.graph["trace_id"])
+
+        normalized_graph_weights(graph)
+
+        for node in nx.topological_sort(graph):
+            node_id = UUID(node)
+            if node_id not in processed_records:
+                continue
+
+            if trace.root_record_id is None:
+                trace.root_record_id = node_id
+
+            trace.add_record(processed_records[node_id])
+
+        traces.append(trace)
+        graph_data = nx.cytoscape_data(graph)
+        config.storage.store_graph_data(trace.trace_id, graph_data)
+
+        if not trace.root_record_id:
+            continue
+
+        root_record = trace.records[trace.root_record_id]
+        if not root_record.function_context:
+            return
+
+        if root_record.function_key in profiles:
+            profiles[root_record.function_key].trace_ids.append(
+                trace.trace_id)
+        else:
+            profiles[root_record.function_key] = Profile(
+                profile_id=uuid4(),
+                trace_ids=[trace.trace_id],
+                function_context=root_record.function_context)
+
+    # Process Profiles
+    print(f"Processing {len(profiles)} profiles")
+    for profile in tqdm(profiles.values()):
+        config.storage.store_profile(profile)
 
 
 def process_record(
     record: Type[TraceRecord],
-    trace_cache: Type[TraceCache],
+    graph_cache: Type[GraphCache],
     request_cache: Type[RequestContextCache]
 ) -> None:
     """
     Process a single unprocessed record
     """
     trace_ctx = record.tracing_context
+    func_ctx = record.function_context
     in_ctx = record.inbound_context
 
     if trace_ctx is None:
@@ -200,32 +268,52 @@ def process_record(
     logger.info(
         f"Processing Record ID {trace_ctx.record_id} - Context: {trace_ctx}")
 
-    trace, graph = trace_cache.create_or_return_trace(
-        trace_id=trace_ctx.trace_id)
-    add_record_to_trace(trace, record)
+    graph: Type[nx.Graph] = graph_cache.create_or_return_graph(
+        trace_id=str(trace_ctx.trace_id))
+
+    graph.add_node(str(record.record_id), **dict(
+        type=FUNCTION_NODE,
+        label=record.node_label,
+        total_execution_time=func_ctx.total_execution_time,
+        handler_execution_time=func_ctx.handler_execution_time,
+        invoked_at=func_ctx.invoked_at,
+        finished_at=func_ctx.finished_at
+    ))
+
+    if trace_ctx.parent_id is not None:
+        attr = {
+            "type": TriggerSynchronicity.SYNC.value,
+            "latency": 1,
+            "label": "N/A ms"
+        }
+
+        if str(trace_ctx.parent_id) in graph:
+            parent_node = graph.nodes[str(trace_ctx.parent_id)]
+            latency = seconds_to_ms(
+                time_delta_in_sec(
+                    func_ctx.invoked_at,
+                    parent_node["finished_at"]))
+            attr["latency"] = latency
+            attr["label"] = print_ms(latency)
+
+        graph.add_edge(str(trace_ctx.parent_id), str(record.record_id), **attr)
+
+    if record.outbound_contexts:
+        resolve_outbound_contexts(record, graph, graph_cache, request_cache)
 
     if in_ctx and in_ctx.resolvable:
         resolve_inbound_context(
-            record,
-            trace,
-            trace_cache,
-            request_cache,
-            graph)
-
-    if record.outbound_contexts:
-        resolve_outbound_contexts(
-            record, trace, trace_cache, request_cache, graph)
+            record, graph, graph_cache, request_cache)
 
 
 def resolve_inbound_context(
     record: Type[TraceRecord],
-    record_trace: Type[Trace],
-    trace_cache: Type[TraceCache],
-    request_cache: Type[RequestContextCache],
-    graph
+    trace_graph: Type[nx.Graph],
+    graph_cache: Type[GraphCache],
+    request_cache: Type[RequestContextCache]
 ) -> None:
     """
-
+    Finds parent trace for the inbound context
     """
     if not record.inbound_context or not record.tracing_context:
         return
@@ -238,19 +326,47 @@ def resolve_inbound_context(
         logger.info(
             f"Found Outbound request for Inbound identifier {identifier_str}")
         parent_trace_ctx, parent_out_ctx = outbound_request
-        parent_trace = trace_cache.get_trace(parent_trace_ctx.trace_id)
-        if parent_trace:
-            logger.info(
-                f"Found Parent trace {parent_trace.trace_id} for parent tracing context {parent_trace_ctx.trace_id}")
+        parent_graph = graph_cache.get_graph(str(parent_trace_ctx.trace_id))
 
-            merge_traces(parent_trace, record_trace)
-            record.tracing_context.parent_id = parent_trace_ctx.record_id
+        if parent_graph:
+            logger.info(
+                f"Found Parent graph {parent_graph} for parent tracing context {parent_trace_ctx.trace_id}")
+
+            if parent_graph.has_edge(
+                    str(parent_trace_ctx.record_id), str(record.record_id)):
+                parent_graph.remove_edge(
+                    str(parent_trace_ctx.record_id), str(record.record_id))
+
+            if trace_graph.has_edge(
+                    str(parent_trace_ctx.record_id), str(record.record_id)):
+                trace_graph.remove_edge(
+                    str(parent_trace_ctx.record_id), str(record.record_id))
 
             record.inbound_context.trigger_finished_at = parent_out_ctx.finished_at
 
-            trace_cache.cache_trace(
-                parent_trace, graph, override_trace_id=record_trace.trace_id)
-            trace_cache.flush_trace(record_trace.trace_id)
+            merge_graphes(graph_cache, parent_graph, trace_graph)
+
+            service_node_id = str(uuid4())
+
+            parent_graph.add_node(
+                service_node_id,
+                **dict(
+                    type=SERVICE_NODE,
+                    total_execution_time=parent_out_ctx.overhead_time +
+                    record.inbound_context.trigger_overhead_time,
+                    label="{out_context}\n{in_context}".format(
+                        out_context=parent_out_ctx.short_str,
+                        in_context=record.inbound_context.short_str)))
+            parent_graph.add_edge(str(parent_trace_ctx.record_id),
+                                  service_node_id,
+                                  **dict(type=parent_out_ctx.trigger_synchronicity.value,
+                                         latency=parent_out_ctx.overhead_time,
+                                         label="{:.2f} ms".format(parent_out_ctx.overhead_time)))
+            parent_graph.add_edge(service_node_id, str(record.record_id), **dict(
+                type=record.inbound_context.trigger_synchronicity.value,
+                latency=record.inbound_context.trigger_overhead_time,
+                label="{:.2f} ms".format(record.inbound_context.trigger_overhead_time)
+            ))
         else:
             logger.info(
                 f"Cannot find parent trace for parent trace ID {parent_trace_ctx.trace_id}")
@@ -269,13 +385,12 @@ def resolve_inbound_context(
 
 def resolve_outbound_contexts(
     record: Type[TraceRecord],
-    record_trace: Type[Trace],
-    trace_cache: Type[TraceCache],
-    request_cache: Type[RequestContextCache],
-    graph
+    trace_graph: Type[nx.Graph],
+    graph_cache: Type[GraphCache],
+    request_cache: Type[RequestContextCache]
 ) -> None:
     """
-
+    Finds a child trace for all outbound contexts
     """
     if not record.outbound_contexts or len(record.outbound_contexts) == 0:
         return
@@ -284,26 +399,51 @@ def resolve_outbound_contexts(
         identifier_str = out_ctx.identifier_string
         inbound_request = request_cache.find_inbound_request_by_outbound_identifier(
             identifier_str)
-
         if inbound_request:
             logger.info(
                 f"Found Inbound request for Outbound identifier {identifier_str}")
             child_context, child_in_ctx = inbound_request
-            child_trace = trace_cache.get_trace(child_context.trace_id)
+            child_graph = graph_cache.get_graph(str(child_context.trace_id))
 
-            if child_trace:
+            if child_graph:
                 logger.info(
-                    f"Found Child trace {child_context.trace_id} for child tracing context {child_context.trace_id}")
+                    f"Found Child trace {child_graph} for child tracing context {child_context.trace_id}")
+
+                if child_graph.has_edge(str(record.record_id), str(
+                        child_context.record_id)):
+                    child_graph.remove_edge(
+                        str(record.record_id), str(child_context.record_id))
+
+                if trace_graph.has_edge(str(record.record_id), str(
+                        child_context.record_id)):
+                    trace_graph.remove_edge(
+                        str(record.record_id), str(child_context.record_id))
 
                 child_in_ctx.trigger_finished_at = out_ctx.finished_at
 
-                merge_traces(record_trace, child_trace,
-                             parent_id=record.tracing_context.record_id,
-                             root_child_record_id=child_context.record_id)
+                merge_graphes(graph_cache, trace_graph, child_graph)
 
-                trace_cache.cache_trace(
-                    record_trace, graph, override_trace_id=child_trace.trace_id)
-                trace_cache.flush_trace(child_trace.trace_id)
+                service_node_id = str(uuid4())
+
+                trace_graph.add_node(
+                    service_node_id,
+                    **dict(
+                        type=SERVICE_NODE,
+                        total_execution_time=out_ctx.overhead_time +
+                        child_in_ctx.trigger_overhead_time,
+                        label="{out_context}\n{in_context}".format(
+                            out_context=out_ctx.short_str,
+                            in_context=child_in_ctx.short_str)))
+
+                trace_graph.add_edge(str(record.record_id),
+                                     service_node_id,
+                                     **dict(type=out_ctx.trigger_synchronicity.value,
+                                            latency=out_ctx.overhead_time,
+                                            label="{:.2f} ms".format(out_ctx.overhead_time)))
+                trace_graph.add_edge(service_node_id, str(child_context.record_id), **dict(
+                    type=child_in_ctx.trigger_synchronicity.value,
+                    latency=child_in_ctx.trigger_overhead_time,
+                    label="{:.2f} ms".format(child_in_ctx.trigger_overhead_time)))
             else:
                 logger.info(
                     f"Cannot find child trace for child trace ID {child_context.trace_id}")
@@ -327,89 +467,98 @@ Helpers
 """
 
 
-def add_record_to_trace(trace: Type[Trace], record: Type[TraceRecord]):
+def merge_graphes(
+    graph_cache: Type[GraphCache],
+    parent_graph: Type[nx.DiGraph],
+    child_graph: Type[nx.DiGraph]
+) -> Type[nx.DiGraph]:
     """
-    Adds record to trace.
-
-    Makes sure that trace id of record is the same than the trace
+    Merges child trace in parent trace.
     """
-    record.tracing_context.trace_id = trace.trace_id
-    trace.records.append(record)
+    parent_trace_id = parent_graph.graph["trace_id"]
+    child_trace_id = child_graph.graph["trace_id"]
 
-    assert record.tracing_context.trace_id == trace.trace_id
+    # Merge child in parent
+    parent_graph.add_nodes_from(child_graph.nodes(data=True))
+    parent_graph.add_edges_from(child_graph.edges(data=True))
+
+    # Create forwarding
+    child_graph.graph["parent_trace_id"] = parent_trace_id
+
+    # Store child graph in cache but forget as unique graph
+    graph_cache.flush_trace(child_trace_id)
 
 
-def merge_traces(
-    parent_trace: Type[Trace],
-    child_trace: Type[Trace],
-    parent_id: UUID = None,
-    root_child_record_id: UUID = None
-) -> None:
+def set_normalized_edge_weights(graph):
     """
-    Merges child trace into parent.
-
-    Complexity: O(num_of_child_records)
+    Calculates normalized edges weights.
     """
-    for record in child_trace.records:
-        record.tracing_context.trace_id = parent_trace.trace_id
-        if parent_id is not None and root_child_record_id == record.tracing_context.record_id:
-            record.tracing_context.parent_id = parent_id
+    min_size, max_size = EDGE_SIZE_LIMIT
 
-        add_record_to_trace(parent_trace, record)
+    latencies = nx.get_edge_attributes(graph, "latency")
+    if len(latencies) == 0:
+        return
 
-    clear_trace_records(child_trace)
+    max_latency = max(latencies.values())
+
+    weights = {k: max(min_size, max_size * v * (1.0 / max_latency))
+               for k, v in latencies.items()}
+
+    nx.set_edge_attributes(graph, weights, "weight")
 
 
-def clear_trace_records(trace: Type[Trace]):
+def set_normalized_node_weights(graph):
     """
-    Resets all records for trace.
+    Calculates normalized node weights.
     """
-    trace.records = []
+    min_size, max_size = NODE_SIZE_LIMIT
+
+    execution_times = nx.get_node_attributes(graph, "total_execution_time")
+    if len(execution_times) == 0:
+        return
+
+    max_time = max(execution_times.values())
+
+    weights = {k: max(min_size, max_size * v * (1.0 / max_time))
+               for k, v in execution_times.items()}
+
+    nx.set_node_attributes(graph, weights, "weight")
 
 
-def add_trace_to_profile(profile: Type[Profile], trace: Type[Trace]) -> None:
+def normalized_graph_weights(graph):
     """
-    Adds a trace to profile
+    Calculates normalized weights.
     """
-    _trace_id = trace.trace_id
-    if _trace_id is None:
-        raise ValueError("Cannot add trace to profile without trace ID.")
+    min_node, max_node = NODE_SIZE_LIMIT
+    min_edge, max_edge = EDGE_SIZE_LIMIT
 
-    profile.trace_ids.add(_trace_id)
+    execution_times = nx.get_node_attributes(graph, "total_execution_time")
+    handler_times = nx.get_node_attributes(graph, "handler_execution_time")
 
+    latencies = nx.get_edge_attributes(graph, "latency")
 
-def get_trace_root_record(trace: Type[Trace]) -> Type[TraceRecord]:
-    """
-    Returns record with no parent ID.
-    Returns None if no records exists.
+    max_exe_time = max(execution_times.values(), default=float('-inf'))
+    max_latencies = max(latencies.values(), default=float('-inf'))
+    max_time = max(max_exe_time, max_latencies)
 
-    If multiple exists, return the record with oldest invoked at.
-    """
-    if not trace.records or len(trace.records) == 0:
-        return None
+    edge_weights = {k: max(min_edge, max_edge * v * (1.0 / max_time))
+                    for k, v in latencies.items()}
 
-    root_records = filter(
-        lambda r: not r.tracing_context.parent_id,
-        trace.records)
-    root_records = sorted(
-        root_records,
-        key=lambda r: r.function_context.invoked_at,
-        reverse=False)
+    node_size = {}
+    node_borders = {}
+    for node, tot_time in execution_times.items():
+        handler_time = handler_times.get(node, tot_time)
+        profiler_time = tot_time - handler_time
 
-    try:
-        return root_records[0]
-    except IndexError:
-        return None
+        handler_frac = handler_time / tot_time
+        profiler_fra = profiler_time / tot_time
 
+        total_weight = max(min_node, max_node * tot_time * (1.0 / max_time))
 
-def get_trace_root_function(trace: Type[Trace]) -> Type[FunctionContext]:
-    """
-    Returns the function context of the root record.
+        node_borders[node] = profiler_fra * total_weight
+        node_size[node] = handler_frac * total_weight + node_borders[node]
 
-    Return None if no root function exists or the function has no function
-    """
-    root_record = get_trace_root_record(trace)
-    if root_record and root_record.function_context:
-        return root_record.function_context
+    nx.set_edge_attributes(graph, edge_weights, "weight")
 
-    return None
+    nx.set_node_attributes(graph, node_size, "size")
+    nx.set_node_attributes(graph, node_borders, "border")
