@@ -1,0 +1,2 @@
+faas_profiler_python @ git+https://github.com/spcl/faas-profiler-python
+numpy
