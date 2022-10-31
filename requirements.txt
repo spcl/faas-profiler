@@ -1,0 +1,41 @@
+# FaaS-Profiler Core for shared datastructures
+faas_profiler_core @ git+https://github.com/spcl/faas-profiler-core
+
+# Docker client for python
+docker
+
+# YML support for python
+pyyaml
+
+# Advanced CLI creation and support
+fire
+inquirer
+click
+tqdm
+
+# AWS interface
+boto3
+
+# caching properties
+cached_property
+
+# templating
+jinja2
+
+# Data management
+marshmallow
+marshmallow_enum
+marshmallow_dataclass
+
+# Dashboard
+dash
+dash_bootstrap_components
+dash_cytoscape
+networkx
+
+# scientific calculation
+numpy
+pandas
+
+# DNS resolving
+dnspython
